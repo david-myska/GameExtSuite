@@ -1,0 +1,110 @@
+Language: Cpp
+AccessModifierOffset: -4
+AlignAfterOpenBracket: Align
+AlignArrayOfStructures: Left
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+AlignEscapedNewlinesLeft: true
+AlignOperands: true
+AlignTrailingComments: true
+AllowAllParametersOfDeclarationOnNextLine: true
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: true
+AllowShortLambdasOnASingleLine: Empty
+AllowShortLoopsOnASingleLine: false
+AlwaysBreakAfterReturnType: None
+AlwaysBreakBeforeMultilineStrings: false
+AlwaysBreakTemplateDeclarations: true
+BinPackArguments: true
+BinPackParameters: true
+BraceWrapping:
+  AfterClass:      true
+  AfterControlStatement: true
+  AfterEnum:       true
+  AfterFunction:   true
+  AfterNamespace:  true
+  AfterObjCDeclaration: true
+  AfterStruct:     true
+  AfterUnion:      true
+  BeforeCatch:     true
+  BeforeElse:      true
+  IndentBraces:    false
+BreakBeforeBinaryOperators: None
+BreakBeforeBraces: Custom
+BreakBeforeTernaryOperators: false
+BreakConstructorInitializersBeforeComma: true
+BreakStringLiterals: true
+ColumnLimit: 130
+CommentPragmas: '^ IWYU pragma:'
+ConstructorInitializerAllOnOneLineOrOnePerLine: false
+ConstructorInitializerIndentWidth: 4
+ContinuationIndentWidth: 4
+Cpp11BracedListStyle: true
+DerivePointerAlignment: false
+DisableFormat: false
+FixNamespaceComments: false
+ForEachMacros: [ foreach, Q_FOREACH, BOOST_FOREACH, FOREACH ]
+IncludeBlocks: Regroup
+IncludeCategories:
+# Headers in <> without extension.
+- Regex:           'stdafx.h'
+  Priority:        -1
+# Headers in <> without extension.
+- Regex:           '^<([A-Za-z0-9\Q/-_\E])+>'
+  Priority:        2
+# Headers in <> from specific libraries.
+- Regex:           '^<(gtest|gmock|idl)'
+  Priority:        3
+# One word headers in <> with .h extension (C headers).
+- Regex:           '^<([A-Za-z0-9.\Q/-_\E])+.h>'
+  Priority:        4
+# Headers "bla.h".
+- Regex:           '^"([A-Za-z0-9.\Q-_\E])+"'
+  Priority:        5
+# Headers "path/to/header/blabla.h"
+- Regex:           '^"([A-Za-z0-9.\Q/-_\E])+"'
+  Priority:        6
+IndentCaseLabels: false
+IndentWidth: 4
+IndentWrappedFunctionNames: false
+KeepEmptyLinesAtTheStartOfBlocks: false
+MacroBlockBegin: '^BEGIN_MSG_MAP|^FEI_BEGIN_ENUM_MAP|^CPP_BEGIN_ENUM_MAP|^BEGIN_COM_MAP|^BEGIN_CONNECTION_POINT_MAP|^#ifdef'
+MacroBlockEnd: '^END_MSG_MAP|^FEI_END_ENUM_MAP|^CPP_END_ENUM_MAP|^END_COM_MAP|^END_CONNECTION_POINT_MAP|^#endif'
+MaxEmptyLinesToKeep: 1
+NamespaceIndentation: All
+PenaltyBreakAssignment: 150
+PenaltyBreakBeforeFirstCallParameter: 100
+PenaltyBreakComment: 10
+PenaltyBreakOpenParenthesis: 20
+PenaltyBreakFirstLessLess: 120
+PenaltyBreakString: 1000
+PenaltyExcessCharacter: 10000
+PenaltyReturnTypeOnItsOwnLine: 200
+PointerAlignment: Left
+ReflowComments: true
+SeparateDefinitionBlocks: Always
+SortIncludes: CaseInsensitive
+SpaceAfterCStyleCast: false
+SpaceAfterTemplateKeyword: true
+SpaceBeforeAssignmentOperators: true
+SpaceBeforeParens: ControlStatements
+SpaceInEmptyParentheses: false
+SpacesBeforeTrailingComments: 2
+SpacesInLineCommentPrefix:
+  Minimum: 1
+  Maximum: 1
+SpacesInAngles: false
+SpacesInCStyleCastParentheses: false
+SpacesInContainerLiterals: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+Standard: c++20
+TabWidth: 4
+UseTab: Never
+
+
+
+
+
