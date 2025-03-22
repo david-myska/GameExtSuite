@@ -34,12 +34,13 @@ namespace GE
          *   - Useful for data that doesn't need to be read as ofter as the main loop and doesn't have complex pointer structures
          *   - Improper use can cause significant performance issues
          */
-        virtual void AddStarterLayout(const std::string& aType, const std::optional<size_t>& aRefrestRateMs = {}) = 0;
+        virtual void AddStarterLayout(const std::string& aType, const std::function<void(const DataStuff&)>& aCallback) = 0;
 
         /*
-         * aType needs to be a starter layout
+         * Set how many frames to keep in memory.
+         * This decides how far back in time the data can be accessed during each refresh.
         */
-        virtual void OnRefresh(const std::string& aType, std::function<void(const DataStuff&)>) = 0;
+        virtual void SetFramesToKeep(size_t aFrames) = 0;
 
         /*
          * Prepares the MemoryProcessor for the main loop.
