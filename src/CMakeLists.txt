@@ -10,11 +10,13 @@ FetchContent_MakeAvailable(pma)
 
 set(SOURCE_FILES
 				"game_enhancer/impl/memory_processor.cpp"
+				"game_enhancer/impl/frame_accessor.cpp"
 				"game_enhancer/impl/layout/memory_layout_builder.cpp"
 )
 
 set(HEADER_FILES
 				"game_enhancer/impl/memory_processor.h"
+				"game_enhancer/impl/frame_accessor.h"
 				"game_enhancer/impl/layout/memory_layout_builder.h"
 				"game_enhancer/impl/layout/frame_memory_storage.h"
 )
@@ -22,6 +24,7 @@ set(HEADER_FILES
 set(API_FILES
 				"game_enhancer/memory_layout_builder.h"
 				"game_enhancer/memory_processor.h"
+				"game_enhancer/frame_accessor.h"
 )
 
 add_library(game_enhancer STATIC ${SOURCE_FILES})

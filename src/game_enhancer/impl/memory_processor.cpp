@@ -1,35 +1,49 @@
 #include "game_enhancer/impl/memory_processor.h"
 
-#include <stdexcept>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <thread>
 #include <unordered_map>
+
+#include "game_enhancer/impl/frame_accessor.h"
 
 namespace GE
 {
     void MemoryProcessorImpl::Update()
     {
-        m_storedFrames.push_back(FrameMemoryStorage());
+        FrameMemoryStorage currentFrameStorage;
         std::unordered_map<size_t, uint8_t*> pointerMap;
         for (const auto& layout : m_starterLayouts)
         {
-            ReadLayout(layout.first, layout.second(), pointerMap);
+            currentFrameStorage.SetLayoutBase(
+                layout.first, ReadLayout(layout.first, layout.second(m_memoryAccess), pointerMap, currentFrameStorage));
         }
 
-        m_callback({} /*TODO need to create a correct object*/);
-
-        if (m_storedFrames.size() >= m_framesToKeep)
+        try
         {
-            m_storedFrames.pop_front();
+            m_callback(FrameAccessorImpl(m_storedFrames));
+        }
+        catch (const std::exception& e)
+        {
+            // TODO log error std::format("Error in MemoryProcessor callback: {}", e.what());
+            // and continue
+            throw;  // just for now
+        }
+
+        m_storedFrames->push_back(std::move(currentFrameStorage));
+        if (m_storedFrames->size() >= m_framesToKeep)
+        {
+            m_storedFrames->pop_front();
         }
     }
 
     uint8_t* MemoryProcessorImpl::ReadLayout(const std::string& aLayoutType, size_t aFromAddress,
-                                             std::unordered_map<size_t, uint8_t*>& aPointerMap)
+                                             std::unordered_map<size_t, uint8_t*>& aPointerMap,
+                                             FrameMemoryStorage& aCurrentFrameStorage)
     {
-        uint8_t* storagePtr = m_storedFrames.back().Allocate(m_layouts[aLayoutType].first);
-        //m_layoutReader->ReadLayout(aLayoutType, aFromAddress, storagePtr);
+        uint8_t* storagePtr = aCurrentFrameStorage.Allocate(m_layouts[aLayoutType].first);
+        m_memoryAccess->Read(aFromAddress, storagePtr, m_layouts.at(aLayoutType).first);
         for (const auto ptr : m_layouts[aLayoutType].second)
         {
             for (size_t i = 0; i < ptr.m_count; ++i)
@@ -42,12 +56,22 @@ namespace GE
                 }
                 if (!aPointerMap.contains(pointerAddress))
                 {
-                    aPointerMap[pointerAddress] = ReadLayout(ptr.m_pointeeType, pointerAddress, aPointerMap);
+                    aPointerMap[pointerAddress] = ReadLayout(ptr.m_pointeeType, pointerAddress, aPointerMap,
+                                                             aCurrentFrameStorage);
                 }
                 *castedPtr = reinterpret_cast<size_t>(aPointerMap[pointerAddress]);
             }
         }
         return storagePtr;
+    }
+
+    MemoryProcessorImpl::MemoryProcessorImpl(PMA::TargetProcessPtr aTargetProcess)
+        : m_targetProcess(std::move(aTargetProcess))
+        , m_autoAttach(PMA::AutoAttach::Create(m_targetProcess))
+    {
+        m_autoAttach->OnAttached([this] {
+            m_memoryAccess = m_targetProcess->GetMemoryAccess();
+        });
     }
 
     void MemoryProcessorImpl::RegisterLayout(const std::string& aLayoutType, LayoutBuilder::Absolute::Layout aLayout)
@@ -56,7 +80,7 @@ namespace GE
         m_layouts[aLayoutType] = std::move(aLayout);
     }
 
-    void MemoryProcessorImpl::SetUpdateCallback(size_t aRateMs, const std::function<void(const DataStuff&)>& aCallback)
+    void MemoryProcessorImpl::SetUpdateCallback(size_t aRateMs, const std::function<void(const FrameAccessor&)>& aCallback)
     {
         EnsureNotRunning();
         m_refreshRateMs = aRateMs;
@@ -74,25 +98,48 @@ namespace GE
     void MemoryProcessorImpl::Start()
     {
         EnsureNotRunning();
-        m_updateThread = std::jthread([this](std::stop_token aStopToken) {
-            m_running = true;
-            while (!aStopToken.stop_requested())
-            {
-                auto frameStartTime = std::chrono::steady_clock::now();
-                // TODO error handling from Update method
-                Update();
-                std::this_thread::sleep_until(frameStartTime + std::chrono::milliseconds(m_refreshRateMs));
-            }
-            m_running = false;
+        m_onAttachedToken = m_autoAttach->OnAttached([this] {
+            m_updateThread = std::jthread([this](std::stop_token aStopToken) {
+                m_running = true;
+                while (!aStopToken.stop_requested())
+                {
+                    auto frameStartTime = std::chrono::steady_clock::now();
+                    try
+                    {
+                        Update();
+                    }
+                    catch (const std::exception& e)
+                    {
+                        if (!m_targetProcess->Exists())
+                        {
+                            // TODO log info "Target process has exited. Stopping MemoryProcessor."
+                        }
+                        else if (!m_targetProcess->IsAttached())
+                        {
+                            // TODO log error "Target process has been detached. Stopping MemoryProcessor."
+                        }
+                        else
+                        {
+                            // TODO log error std::format("Error in MemoryProcessor: {}", e.what());
+                        }
+                        break;
+                    }
+                    std::this_thread::sleep_until(frameStartTime + std::chrono::milliseconds(m_refreshRateMs));
+                }
+                m_running = false;
+            });
         });
+        m_autoAttach->Start();
     }
 
     void MemoryProcessorImpl::Stop()
     {
+        m_onAttachedToken.reset();
         m_updateThread.request_stop();
     }
 
-    void MemoryProcessorImpl::AddStarterLayout(const std::string& aType, const std::function<size_t()>& aCallback)
+    void MemoryProcessorImpl::AddStarterLayout(const std::string& aType,
+                                               const std::function<size_t(PMA::MemoryAccessPtr aMemoryAccess)>& aCallback)
     {
         EnsureNotRunning();
         m_starterLayouts[aType] = aCallback;
@@ -107,6 +154,11 @@ namespace GE
     void MemoryProcessorImpl::Initialize()
     {
         EnsureNotRunning();
-        // TODO somewhere the connection to the Process needs to be done
+        // TODO
+    }
+
+    MemoryProcessorPtr MemoryProcessor::Create(PMA::TargetProcessPtr aTargetProcess)
+    {
+        return std::make_unique<MemoryProcessorImpl>(std::move(aTargetProcess));
     }
 }
