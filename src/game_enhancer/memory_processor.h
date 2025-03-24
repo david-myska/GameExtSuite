@@ -10,7 +10,9 @@
 
 namespace GE
 {
-    struct DataStuff;
+    struct DataStuff
+    {
+    };
 
     /*
      * Every pointer, whose type has been registered as a layout, is automatically resolved.

@@ -9,7 +9,7 @@ namespace GE
     class AbsoluteImpl : public LayoutBuilder::Absolute
     {
         size_t m_totalSize = 0;
-        std::vector<size_t> m_pointerOffsets;
+        std::vector<LayoutBuilder::Ptr> m_pointerOffsets;
 
     public:
         AbsoluteImpl& SetTotalSize(size_t aBytes) override;

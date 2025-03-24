@@ -23,13 +23,13 @@ namespace GE
         // TODO substitute with pure PMA
         std::shared_ptr<LayoutReader> m_layoutReader;
 
-        size_t m_refreshRateMs 100;
+        size_t m_refreshRateMs = 100;
         std::jthread m_updateThread;
         std::function<void(const DataStuff&)> m_callback;
         std::atomic<bool> m_running = false;
 
         void Update();
-        void ReadLayout(const std::string& aLayoutType, size_t aFromAddress, std::unordered_map<size_t, size_t>& aPointerMap);
+        uint8_t* ReadLayout(const std::string& aLayoutType, size_t aFromAddress, std::unordered_map<size_t, uint8_t*>& aPointerMap);
         void EnsureNotRunning() const;
 
     public:
@@ -40,7 +40,7 @@ namespace GE
         void Start() override;
         void Stop() override;
 
-        void AddStarterLayout(const std::string& aType, const std::function<void(const DataStuff&)>& aCallback) override;
+        void AddStarterLayout(const std::string& aType, const std::function<size_t()>& aCallback) override;
         void SetFramesToKeep(size_t aFrames) override;
         void Initialize() override;
     };

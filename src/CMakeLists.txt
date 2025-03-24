@@ -1,14 +1,18 @@
 
 set(SOURCE_FILES
-				"game_enhancer/impl/memory_layout.cpp"
+				"game_enhancer/impl/memory_processor.cpp"
+				"game_enhancer/impl/layout/memory_layout_builder.cpp"
 )
 
 set(HEADER_FILES
-				"game_enhancer/impl/memory_layout.h"
+				"game_enhancer/impl/memory_processor.h"
+				"game_enhancer/impl/layout/memory_layout_builder.h"
+				"game_enhancer/impl/layout/frame_memory_storage.h"
 )
 
 set(API_FILES
-				"game_enhancer/memory_layout.h"
+				"game_enhancer/memory_layout_builder.h"
+				"game_enhancer/memory_processor.h"
 )
 
 add_library(game_enhancer STATIC ${SOURCE_FILES})

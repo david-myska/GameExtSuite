@@ -1,6 +1,6 @@
 #include "game_enhancer/impl/memory_processor.h"
 
-#include <exception>
+#include <stdexcept>
 #include <memory>
 #include <string>
 #include <thread>
@@ -11,7 +11,7 @@ namespace GE
     void MemoryProcessorImpl::Update()
     {
         m_storedFrames.push_back(FrameMemoryStorage());
-        std::unordered_map<size_t, size_t> pointerMap;
+        std::unordered_map<size_t, uint8_t*> pointerMap;
         for (const auto& layout : m_starterLayouts)
         {
             ReadLayout(layout.first, layout.second(), pointerMap);
@@ -26,10 +26,10 @@ namespace GE
     }
 
     uint8_t* MemoryProcessorImpl::ReadLayout(const std::string& aLayoutType, size_t aFromAddress,
-                                             std::unordered_map<size_t, size_t>& aPointerMap)
+                                             std::unordered_map<size_t, uint8_t*>& aPointerMap)
     {
         uint8_t* storagePtr = m_storedFrames.back().Allocate(m_layouts[aLayoutType].first);
-        m_layoutReader->ReadLayout(aLayoutType, aFromAddress, storagePtr);
+        //m_layoutReader->ReadLayout(aLayoutType, aFromAddress, storagePtr);
         for (const auto ptr : m_layouts[aLayoutType].second)
         {
             for (size_t i = 0; i < ptr.m_count; ++i)
@@ -40,11 +40,11 @@ namespace GE
                 {
                     continue;
                 }
-                if (!pointerMap.contains(pointerAddress))
+                if (!aPointerMap.contains(pointerAddress))
                 {
-                    aPointerMap[pointerAddress] = ReadLayoutRecursive(ptr.m_pointeeType, pointerAddress, aPointerMap);
+                    aPointerMap[pointerAddress] = ReadLayout(ptr.m_pointeeType, pointerAddress, aPointerMap);
                 }
-                *castedPtr = aPointerMap[pointerAddress];
+                *castedPtr = reinterpret_cast<size_t>(aPointerMap[pointerAddress]);
             }
         }
         return storagePtr;
@@ -92,7 +92,7 @@ namespace GE
         m_updateThread.request_stop();
     }
 
-    void MemoryProcessorImpl::AddStarterLayout(const std::string& aType, const std::function<void(const DataStuff&)>& aCallback)
+    void MemoryProcessorImpl::AddStarterLayout(const std::string& aType, const std::function<size_t()>& aCallback)
     {
         EnsureNotRunning();
         m_starterLayouts[aType] = aCallback;

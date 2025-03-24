@@ -1,6 +1,6 @@
 #include "ge_test.h"
 
-#include "game_enhancer/memory_layout.h"
+#include "game_enhancer/memory_layout_builder.h"
 
 TEST_F(GE_Tests, Test)
 {
