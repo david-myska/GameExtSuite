@@ -1,4 +1,13 @@
 
+include(FetchContent)
+
+FetchContent_Declare(
+  pma
+  GIT_REPOSITORY https://github.com/david-myska/ProcessMemoryAccess.git
+  GIT_TAG        master
+)
+FetchContent_MakeAvailable(pma)
+
 set(SOURCE_FILES
 				"game_enhancer/impl/memory_processor.cpp"
 				"game_enhancer/impl/layout/memory_layout_builder.cpp"
@@ -23,6 +32,9 @@ target_include_directories(game_enhancer PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${GE_INSTALL_INCLUDE_DIR}>
 )
+
+target_link_libraries(game_enhancer PUBLIC PMA::pma)
+
 
 install(TARGETS game_enhancer DESTINATION ${GE_INSTALL_LIB_DIR})
 install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/game_enhancer
