@@ -24,17 +24,18 @@ namespace GE
         // virtual void RegisterLayout(const std::string& aType, LayoutBuilder::Relative::Layout aLayout) = 0;
 
         /*
-         * Sets refresh rate of the main loop.
-         * Calculation from FrameRate to RefreshRate: 1000 / FrameRate
+         * aRateMs Sets update rate of a new frame.
+         * Calculation from FrameRate to UpdateRate: 1000 / FrameRate
          */
-        virtual void SetRefreshRate(size_t aRateMs) = 0;
+        virtual void SetUpdateCallback(size_t aRateMs, const std::function<void(const DataStuff&)>& aCallback) = 0;
+
         /*
          * Adds a starting layout that will be used to resolve pointers and read their layouts
          * Specifying refresh rate for a layout will cause it to be completely separated from the main loop.
          *   - Useful for data that doesn't need to be read as ofter as the main loop and doesn't have complex pointer structures
          *   - Improper use can cause significant performance issues
          */
-        virtual void AddStarterLayout(const std::string& aType, const std::function<void(const DataStuff&)>& aCallback) = 0;
+        virtual void AddStarterLayout(const std::string& aType, const std::function<size_t()>& aCallback) = 0;
 
         /*
          * Set how many frames to keep in memory.
