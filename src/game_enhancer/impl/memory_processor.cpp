@@ -69,9 +69,6 @@ namespace GE
         : m_targetProcess(std::move(aTargetProcess))
         , m_autoAttach(PMA::AutoAttach::Create(m_targetProcess))
     {
-        m_autoAttach->OnAttached([this] {
-            m_memoryAccess = m_targetProcess->GetMemoryAccess();
-        });
     }
 
     void MemoryProcessorImpl::RegisterLayout(const std::string& aLayoutType, LayoutBuilder::Absolute::Layout aLayout)
@@ -98,7 +95,12 @@ namespace GE
     void MemoryProcessorImpl::Start()
     {
         EnsureNotRunning();
+        if (!m_callback)
+        {
+            throw std::runtime_error("No update callback set!");
+        }
         m_onAttachedToken = m_autoAttach->OnAttached([this] {
+            m_memoryAccess = m_targetProcess->GetMemoryAccess();
             m_updateThread = std::jthread([this](std::stop_token aStopToken) {
                 m_running = true;
                 while (!aStopToken.stop_requested())
@@ -136,6 +138,10 @@ namespace GE
     {
         m_onAttachedToken.reset();
         m_updateThread.request_stop();
+        if (m_updateThread.joinable())
+        {
+            m_updateThread.join();
+        }
     }
 
     void MemoryProcessorImpl::AddStarterLayout(const std::string& aType,
