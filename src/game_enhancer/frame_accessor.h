@@ -20,7 +20,7 @@ namespace GE
         }
 
         template <typename T>
-        auto GetFrames(const std::string& aLayout) const
+        auto Get2Frames(const std::string& aLayout) const
         {
             return GetFrames<T, 0, 1>(aLayout);
         }
