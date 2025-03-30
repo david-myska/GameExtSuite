@@ -12,6 +12,7 @@ set(SOURCE_FILES
 				"game_enhancer/impl/memory_processor.cpp"
 				"game_enhancer/impl/frame_accessor.cpp"
 				"game_enhancer/impl/layout/memory_layout_builder.cpp"
+				"game_enhancer/impl/layout/frame_memory_storage.cpp"
 )
 
 set(HEADER_FILES

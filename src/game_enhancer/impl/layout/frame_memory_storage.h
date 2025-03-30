@@ -1,21 +1,19 @@
 #pragma once
 
 #include <deque>
-#include <vector>
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace GE
 {
-    struct Metadata {
-        PMA::MemoryAddress m_realAddress = 0;
+    struct Metadata
+    {
+        size_t m_realAddress = 0;
         bool m_dirty = false;
     };
 
-    Metadata* GetMetadata(uint8_t* fromData)
-    {
-        return reinterpret_cast<Metadata*>(fromData - sizeof(Metadata));
-    }
-
+    Metadata* GetMetadata(uint8_t* fromData);
 
     class FrameMemoryStorage
     {
@@ -23,15 +21,10 @@ namespace GE
         std::unordered_map<std::string, uint8_t*> m_layoutBase;
 
     public:
-        uint8_t* Allocate(size_t aSize)
-        {
-            auto dataPtr = m_storage.emplace_back(std::vector<uint8_t>(sizeof(Metadata) + aSize)).data() + sizeof(Metadata);
-            *GetMetadata(dataPtr) = {};
-            return dataPtr;
-        }
+        uint8_t* Allocate(size_t aSize);
 
-        void SetLayoutBase(const std::string& aLayoutType, uint8_t* aBase) { m_layoutBase[aLayoutType] = aBase; }
-        uint8_t* GetLayoutBase(const std::string& aLayoutType) { return m_layoutBase[aLayoutType]; }
+        void SetLayoutBase(const std::string& aLayoutType, uint8_t* aBase);
+        uint8_t* GetLayoutBase(const std::string& aLayoutType);
     };
 
 }

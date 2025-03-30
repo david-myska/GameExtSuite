@@ -50,7 +50,7 @@ namespace GE
         uint8_t* storagePtr = aCurrentFrameStorage.Allocate(m_layouts[aLayoutType].first);
         GetMetadata(storagePtr)->m_realAddress = aFromAddress;
         m_memoryAccess->Read(aFromAddress, storagePtr, m_layouts.at(aLayoutType).first);
-        for (const auto ptr : m_layouts[aLayoutType].second)
+        for (const auto& ptr : m_layouts[aLayoutType].second)
         {
             for (size_t i = 0; i < ptr.m_count; ++i)
             {
