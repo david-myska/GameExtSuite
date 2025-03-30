@@ -19,13 +19,13 @@ namespace GE
         std::unordered_map<std::string, std::function<size_t(PMA::MemoryAccessPtr aMemoryAccess)>> m_starterLayouts;
         std::unordered_map<std::string, LayoutBuilder::Absolute::Layout> m_layouts;
 
-        size_t m_framesToKeep = 2;
-        std::shared_ptr<std::deque<FrameMemoryStorage>> m_storedFrames;
-
         PMA::TargetProcessPtr m_targetProcess;
         PMA::AutoAttachPtr m_autoAttach;
         PMA::ScopedTokenPtr m_onAttachedToken;
         PMA::MemoryAccessPtr m_memoryAccess;
+
+        std::shared_ptr<std::deque<FrameMemoryStorage>> m_storedFrames;
+        size_t m_framesToKeep = 2;
 
         size_t m_refreshRateMs = 100;
         std::jthread m_updateThread;
@@ -39,6 +39,7 @@ namespace GE
 
     public:
         MemoryProcessorImpl(PMA::TargetProcessPtr aTargetProcess);
+        ~MemoryProcessorImpl();
 
         void RegisterLayout(const std::string& aLayoutType, LayoutBuilder::Absolute::Layout aLayout) override;
         void SetUpdateCallback(size_t aRateMs, const std::function<void(const FrameAccessor&)>& aCallback) override;

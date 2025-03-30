@@ -19,7 +19,7 @@ namespace GE
      */
     struct MemoryProcessor
     {
-        static MemoryProcessorPtr Create(PMA::TargetProcessPtr aTargetProcess);
+        static [[nodiscard]] MemoryProcessorPtr Create(PMA::TargetProcessPtr aTargetProcess);
 
         /*
          * Registers possible starter layouts and layouts that pointers can point at

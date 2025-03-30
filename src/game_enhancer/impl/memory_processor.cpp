@@ -1,5 +1,6 @@
 #include "game_enhancer/impl/memory_processor.h"
 
+#include <iostream>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -20,6 +21,16 @@ namespace GE
                 layout.first, ReadLayout(layout.first, layout.second(m_memoryAccess), pointerMap, currentFrameStorage));
         }
 
+        m_storedFrames->push_back(std::move(currentFrameStorage));
+        if (m_storedFrames->size() > m_framesToKeep)
+        {
+            m_storedFrames->pop_front();
+        }
+        if (m_storedFrames->size() < m_framesToKeep)
+        {
+            return;
+        }
+
         try
         {
             m_callback(FrameAccessorImpl(m_storedFrames));
@@ -30,12 +41,6 @@ namespace GE
             // and continue
             throw;  // just for now
         }
-
-        m_storedFrames->push_back(std::move(currentFrameStorage));
-        if (m_storedFrames->size() >= m_framesToKeep)
-        {
-            m_storedFrames->pop_front();
-        }
     }
 
     uint8_t* MemoryProcessorImpl::ReadLayout(const std::string& aLayoutType, size_t aFromAddress,
@@ -43,6 +48,7 @@ namespace GE
                                              FrameMemoryStorage& aCurrentFrameStorage)
     {
         uint8_t* storagePtr = aCurrentFrameStorage.Allocate(m_layouts[aLayoutType].first);
+        GetMetadata(storagePtr)->m_realAddress = aFromAddress;
         m_memoryAccess->Read(aFromAddress, storagePtr, m_layouts.at(aLayoutType).first);
         for (const auto ptr : m_layouts[aLayoutType].second)
         {
@@ -68,10 +74,13 @@ namespace GE
     MemoryProcessorImpl::MemoryProcessorImpl(PMA::TargetProcessPtr aTargetProcess)
         : m_targetProcess(std::move(aTargetProcess))
         , m_autoAttach(PMA::AutoAttach::Create(m_targetProcess))
+        , m_storedFrames(std::make_shared<std::deque<FrameMemoryStorage>>())
     {
-        m_autoAttach->OnAttached([this] {
-            m_memoryAccess = m_targetProcess->GetMemoryAccess();
-        });
+    }
+
+    MemoryProcessorImpl::~MemoryProcessorImpl()
+    {
+        Stop();
     }
 
     void MemoryProcessorImpl::RegisterLayout(const std::string& aLayoutType, LayoutBuilder::Absolute::Layout aLayout)
@@ -99,6 +108,7 @@ namespace GE
     {
         EnsureNotRunning();
         m_onAttachedToken = m_autoAttach->OnAttached([this] {
+            m_memoryAccess = m_targetProcess->GetMemoryAccess();
             m_updateThread = std::jthread([this](std::stop_token aStopToken) {
                 m_running = true;
                 while (!aStopToken.stop_requested())
@@ -110,17 +120,21 @@ namespace GE
                     }
                     catch (const std::exception& e)
                     {
+                        std::cout << "Except in Update" << std::endl;
                         if (!m_targetProcess->Exists())
                         {
                             // TODO log info "Target process has exited. Stopping MemoryProcessor."
+                            std::cout << "!Exists" << std::endl;
                         }
                         else if (!m_targetProcess->IsAttached())
                         {
                             // TODO log error "Target process has been detached. Stopping MemoryProcessor."
+                            std::cout << "!IsAttached" << std::endl;
                         }
                         else
                         {
                             // TODO log error std::format("Error in MemoryProcessor: {}", e.what());
+                            std::cout << "Else: " << e.what() << std::endl;
                         }
                         break;
                     }

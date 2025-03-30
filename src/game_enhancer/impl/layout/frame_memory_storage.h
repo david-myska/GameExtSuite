@@ -6,6 +6,17 @@
 
 namespace GE
 {
+    struct Metadata {
+        PMA::MemoryAddress m_realAddress = 0;
+        bool m_dirty = false;
+    };
+
+    Metadata* GetMetadata(uint8_t* fromData)
+    {
+        return reinterpret_cast<Metadata*>(fromData - sizeof(Metadata));
+    }
+
+
     class FrameMemoryStorage
     {
         std::deque<std::vector<uint8_t>> m_storage;
@@ -14,8 +25,9 @@ namespace GE
     public:
         uint8_t* Allocate(size_t aSize)
         {
-            m_storage.push_back(std::vector<uint8_t>(aSize));
-            return m_storage.back().data();
+            auto dataPtr = m_storage.emplace_back(std::vector<uint8_t>(sizeof(Metadata) + aSize)).data() + sizeof(Metadata);
+            *GetMetadata(dataPtr) = {};
+            return dataPtr;
         }
 
         void SetLayoutBase(const std::string& aLayoutType, uint8_t* aBase) { m_layoutBase[aLayoutType] = aBase; }

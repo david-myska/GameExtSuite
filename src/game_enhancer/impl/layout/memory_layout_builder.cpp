@@ -1,9 +1,9 @@
 #pragma once
 
+#include "game_enhancer/impl/layout/memory_layout_builder.h"
+
 #include <memory>
 #include <string>
-
-#include "game_enhancer/impl/layout/memory_layout_builder.h"
 
 namespace GE
 {
@@ -15,10 +15,7 @@ namespace GE
 
     AbsoluteImpl& AbsoluteImpl::AddPointerOffsets(size_t aOffset, const std::string& aPointeeType, size_t aCount)
     {
-        for (size_t i = 0; i < aCount; ++i)
-        {
-            m_pointerOffsets.push_back({aOffset, aCount, aPointeeType});
-        }
+        m_pointerOffsets.push_back({aOffset, aCount, aPointeeType});
         return *this;
     }
 
