@@ -4,9 +4,9 @@
 
 namespace GE
 {
-    struct FrameAccessor
+    struct DataAccessor
     {
-        virtual ~FrameAccessor() = default;
+        virtual ~DataAccessor() = default;
 
         /*
          * aFrameIdx 0 is the most recent frame, 1 is the frame before that, etc.

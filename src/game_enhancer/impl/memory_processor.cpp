@@ -7,7 +7,7 @@
 #include <thread>
 #include <unordered_map>
 
-#include "game_enhancer/impl/frame_accessor.h"
+#include "game_enhancer/impl/data_accessor.h"
 
 namespace GE
 {

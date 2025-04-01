@@ -4,7 +4,7 @@
 #include <memory>
 #include <stdexcept>
 
-#include "game_enhancer/frame_accessor.h"
+#include "game_enhancer/data_accessor.h"
 #include "game_enhancer/impl/layout/frame_memory_storage.h"
 
 namespace GE

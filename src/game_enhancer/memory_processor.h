@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "game_enhancer/memory_layout_builder.h"
-#include "game_enhancer/frame_accessor.h"
+#include "game_enhancer/data_accessor.h"
 #include "pma/target_process.h"
 
 namespace GE
