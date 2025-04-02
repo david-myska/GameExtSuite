@@ -47,42 +47,43 @@ namespace GE
         mutable bool m_evaluatedToTrue = false;
     };
 
-    template <typename AchiData>
+    template <typename... CallableArgs>
     struct AchiCondition
     {
         std::string m_description;
-        Condition<AchiData> m_condition;
+        Condition<CallableArgs...> m_condition;
     };
 
-    template <typename AchiData>
-    std::vector<bool> EvaluateEach(const std::vector<AchiCondition<AchiData>>& aConditions, const DataAccessor& aDataAccess,
-                                   AchiData& aAchiData)
+    template <typename... CallableArgs>
+    std::vector<bool> EvaluateEach(const std::vector<AchiCondition<CallableArgs...>>& aConditions, const DataAccessor& aDataAccess,
+                                   CallableArgs...& aArgs)
     {
         std::vector<bool> result;
         result.reserve(aConditions.size());
         for (const auto& c : aConditions)
         {
-            result.push_back(c.m_condition.Evaluate(aDataAccess, aAchiData));
+            result.push_back(c.m_condition.Evaluate(aDataAccess, aArgs...));
         }
         return result;
     }
 
-    template <typename AchiData>
-    bool EvaluateAnd(const std::vector<AchiCondition<AchiData>>& aConditions, const DataAccessor& aDataAccess,
-                     AchiData& aAchiData)
+    template <typename... CallableArgs>
+    bool EvaluateAnd(const std::vector<AchiCondition<CallableArgs...>>& aConditions, const DataAccessor& aDataAccess,
+                     CallableArgs...& aArgs)
     {
-        auto boolVector = EvaluateEach(aConditions, aDataAccess, aAchiData);
+        auto boolVector = EvaluateEach(aConditions, aDataAccess, aArgs...);
         return std::accumulate(boolVector.begin(), boolVector.end(), true, std::logical_and<bool>());
     }
 
-    template <typename AchiData>
-    bool EvaluateOr(const std::vector<AchiCondition<AchiData>>& aConditions, const DataAccessor& aDataAccess, AchiData& aAchiData)
+    template <typename... CallableArgs>
+    bool EvaluateOr(const std::vector<AchiCondition<CallableArgs...>>& aConditions, const DataAccessor& aDataAccess,
+                    CallableArgs...& aArgs)
     {
-        auto boolVector = EvaluateEach(aConditions, aDataAccess, aAchiData);
+        auto boolVector = EvaluateEach(aConditions, aDataAccess, aArgs...);
         return std::accumulate(boolVector.begin(), boolVector.end(), false, std::logical_or<bool>());
     }
 
-    template <typename AchiData>
+    template <typename... CallableArgs>
     class Conditions
     {
         /*
@@ -90,103 +91,103 @@ namespace GE
          * Commonly used to filter achievements according to very general requirements.
          * Level, location, story progress...
          */
-        std::vector<AchiCondition<AchiData>> m_preconditions;
+        std::vector<AchiCondition<CallableArgs...>> m_preconditions;
         /*
          * All activators need to evaluate to true at the same time to activate the achievement.
          */
-        std::vector<AchiCondition<AchiData>> m_activators;
+        std::vector<AchiCondition<CallableArgs...>> m_activators;
         /*
          * All invariants need to evaluate to true on each update.
          * If not, the achievement is marked as Failed.
          * Invariants are just a special case of failers.
          */
-        std::vector<AchiCondition<AchiData>> m_invariants;
+        std::vector<AchiCondition<CallableArgs...>> m_invariants;
 
         /*
          * When all completers evaluate to true at the same time, the achievemnt is marked as Completed.
          */
-        std::vector<AchiCondition<AchiData>> m_completers;
+        std::vector<AchiCondition<CallableArgs...>> m_completers;
         /*
          * Any failer evaluating to true causes the achievement to be marked as Failed.
          */
-        std::vector<AchiCondition<AchiData>> m_failers;
+        std::vector<AchiCondition<CallableArgs...>> m_failers;
 
         /*
          * When all reseters evaluate to true, achievement can change status from Failed to Inactive.
          */
-        std::vector<AchiCondition<AchiData>> m_reseters;
+        std::vector<AchiCondition<CallableArgs...>> m_reseters;
 
     public:
-        Conditions& AddPrecondition(std::string aDescription, const Condition<AchiData>::Callable& aCallable,
+        Conditions& AddPrecondition(std::string aDescription, const Condition<CallableArgs...>::Callable& aCallable,
                                     bool aOneTimeSuffice = false)
         {
-            m_preconditions.push_back({std::move(aDescription), Condition<AchiData>(aCallable, aOneTimeSuffice)});
+            m_preconditions.push_back({std::move(aDescription), Condition<CallableArgs...>(aCallable, aOneTimeSuffice)});
             return *this;
         }
 
-        Conditions& AddActivator(std::string aDescription, const Condition<AchiData>::Callable& aCallable,
+        Conditions& AddActivator(std::string aDescription, const Condition<CallableArgs...>::Callable& aCallable,
                                  bool aOneTimeSuffice = false)
         {
-            m_activators.push_back({std::move(aDescription), Condition<AchiData>(aCallable, aOneTimeSuffice)});
+            m_activators.push_back({std::move(aDescription), Condition<CallableArgs...>(aCallable, aOneTimeSuffice)});
             return *this;
         }
 
-        Conditions& AddInvariant(std::string aDescription, const Condition<AchiData>::Callable& aCallable,
+        Conditions& AddInvariant(std::string aDescription, const Condition<CallableArgs...>::Callable& aCallable,
                                  bool aOneTimeSuffice = false)
         {
-            m_invariants.push_back({std::move(aDescription), Condition<AchiData>(aCallable, aOneTimeSuffice)});
+            m_invariants.push_back({std::move(aDescription), Condition<CallableArgs...>(aCallable, aOneTimeSuffice)});
             return *this;
         }
 
-        Conditions& AddCompleter(std::string aDescription, const Condition<AchiData>::Callable& aCallable,
+        Conditions& AddCompleter(std::string aDescription, const Condition<CallableArgs...>::Callable& aCallable,
                                  bool aOneTimeSuffice = false)
         {
-            m_completers.push_back({std::move(aDescription), Condition<AchiData>(aCallable, aOneTimeSuffice)});
+            m_completers.push_back({std::move(aDescription), Condition<CallableArgs...>(aCallable, aOneTimeSuffice)});
             return *this;
         }
 
-        Conditions& AddFailer(std::string aDescription, const Condition<AchiData>::Callable& aCallable,
+        Conditions& AddFailer(std::string aDescription, const Condition<CallableArgs...>::Callable& aCallable,
                               bool aOneTimeSuffice = false)
         {
-            m_failers.push_back({std::move(aDescription), Condition<AchiData>(aCallable, aOneTimeSuffice)});
+            m_failers.push_back({std::move(aDescription), Condition<CallableArgs...>(aCallable, aOneTimeSuffice)});
             return *this;
         }
 
-        Conditions& AddReseter(std::string aDescription, const Condition<AchiData>::Callable& aCallable,
+        Conditions& AddReseter(std::string aDescription, const Condition<CallableArgs...>::Callable& aCallable,
                                bool aOneTimeSuffice = false)
         {
-            m_reseters.push_back({std::move(aDescription), Condition<AchiData>(aCallable, aOneTimeSuffice)});
+            m_reseters.push_back({std::move(aDescription), Condition<CallableArgs...>(aCallable, aOneTimeSuffice)});
             return *this;
         }
 
-        bool EvaluatePreconditions(const DataAccessor& aDataAccess, AchiData& aAchiData) const
+        bool EvaluatePreconditions(const DataAccessor& aDataAccess, CallableArgs...& aArgs) const
         {
-            return EvaluateAnd(m_preconditions, aDataAccess, aAchiData);
+            return EvaluateAnd(m_preconditions, aDataAccess, aArgs...);
         }
 
-        bool EvaluateActivators(const DataAccessor& aDataAccess, AchiData& aAchiData) const
+        bool EvaluateActivators(const DataAccessor& aDataAccess, CallableArgs...& aArgs) const
         {
-            return EvaluateAnd(m_activators, aDataAccess, aAchiData);
+            return EvaluateAnd(m_activators, aDataAccess, aArgs...);
         }
 
-        bool EvaluateInvariants(const DataAccessor& aDataAccess, AchiData& aAchiData) const
+        bool EvaluateInvariants(const DataAccessor& aDataAccess, CallableArgs...& aArgs) const
         {
-            return EvaluateAnd(m_invariants, aDataAccess, aAchiData);
+            return EvaluateAnd(m_invariants, aDataAccess, aArgs...);
         }
 
-        bool EvaluateCompleters(const DataAccessor& aDataAccess, AchiData& aAchiData) const
+        bool EvaluateCompleters(const DataAccessor& aDataAccess, CallableArgs...& aArgs) const
         {
-            return EvaluateAnd(m_completers, aDataAccess, aAchiData);
+            return EvaluateAnd(m_completers, aDataAccess, aArgs...);
         }
 
-        bool EvaluateFailers(const DataAccessor& aDataAccess, AchiData& aAchiData) const
+        bool EvaluateFailers(const DataAccessor& aDataAccess, CallableArgs...& aArgs) const
         {
-            return EvaluateOr(m_failers, aDataAccess, aAchiData);
+            return EvaluateOr(m_failers, aDataAccess, aArgs...);
         }
 
-        bool EvaluateReseters(const DataAccessor& aDataAccess, AchiData& aAchiData) const
+        bool EvaluateReseters(const DataAccessor& aDataAccess, CallableArgs...& aArgs) const
         {
-            return EvaluateAnd(m_reseters, aDataAccess, aAchiData);
+            return EvaluateAnd(m_reseters, aDataAccess, aArgs...);
         }
     };
 }

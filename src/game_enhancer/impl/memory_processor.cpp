@@ -33,7 +33,7 @@ namespace GE
 
         try
         {
-            m_callback(FrameAccessorImpl(m_storedFrames));
+            m_callback(DataAccessorImpl(m_storedFrames));
         }
         catch (const std::exception& e)
         {
@@ -89,7 +89,7 @@ namespace GE
         m_layouts[aLayoutType] = std::move(aLayout);
     }
 
-    void MemoryProcessorImpl::SetUpdateCallback(size_t aRateMs, const std::function<void(const FrameAccessor&)>& aCallback)
+    void MemoryProcessorImpl::SetUpdateCallback(size_t aRateMs, const std::function<void(const DataAccessor&)>& aCallback)
     {
         EnsureNotRunning();
         m_refreshRateMs = aRateMs;

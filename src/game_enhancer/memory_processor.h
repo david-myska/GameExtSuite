@@ -31,7 +31,7 @@ namespace GE
          * aRateMs Sets update rate of a new frame.
          * Calculation from FrameRate to UpdateRate: 1000 / FrameRate
          */
-        virtual void SetUpdateCallback(size_t aRateMs, const std::function<void(const FrameAccessor&)>& aCallback) = 0;
+        virtual void SetUpdateCallback(size_t aRateMs, const std::function<void(const DataAccessor&)>& aCallback) = 0;
 
         /*
          * Adds a starting layout that will be used to resolve pointers and read their layouts

@@ -29,7 +29,7 @@ namespace GE
 
         size_t m_refreshRateMs = 100;
         std::jthread m_updateThread;
-        std::function<void(const FrameAccessor&)> m_callback;
+        std::function<void(const DataAccessor&)> m_callback;
         std::atomic<bool> m_running = false;
 
         void Update();
@@ -42,7 +42,7 @@ namespace GE
         ~MemoryProcessorImpl();
 
         void RegisterLayout(const std::string& aLayoutType, LayoutBuilder::Absolute::Layout aLayout) override;
-        void SetUpdateCallback(size_t aRateMs, const std::function<void(const FrameAccessor&)>& aCallback) override;
+        void SetUpdateCallback(size_t aRateMs, const std::function<void(const DataAccessor&)>& aCallback) override;
         void Start() override;
         void Stop() override;
 

@@ -278,7 +278,7 @@ TEST_F(GE_Tests, Test)
         return address;
     });
     memoryProcessor->Initialize();
-    memoryProcessor->SetUpdateCallback(1000, [](const GE::FrameAccessor& aFrameAccessor) {
+    memoryProcessor->SetUpdateCallback(1000, [](const GE::DataAccessor& aFrameAccessor) {
         auto frames = aFrameAccessor.Get2Frames<Raw::Game>("Game");
         auto game = std::get<0>(frames);
         std::cout << "D2 Counter: " << game->m_gameFrame << std::endl;
