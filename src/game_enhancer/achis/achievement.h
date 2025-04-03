@@ -70,11 +70,11 @@ namespace GE
 
         void ProcessActive(const DataAccessor& aDataAccess)
         {
-            if (m_condition.EvaluateCompleters(aDataAccess))
+            if (m_conditions.EvaluateCompleters(aDataAccess))
             {
                 m_status = Status::Completed;
             }
-            else if (!m_condition.EvaluateInvariants(aDataAccess) || m_conditions.EvaluateFailers(aDataAccess))
+            else if (!m_conditions.EvaluateInvariants(aDataAccess) || m_conditions.EvaluateFailers(aDataAccess))
             {
                 m_status = Status::Failed;
             }
@@ -94,7 +94,7 @@ namespace GE
          * Custom data can be used to store name, description, difficulty, reward, ...
          * Just any static data that you might want to display.
          */
-        const std::enable_if_t<!std::is_same_v<None, Metadata>, Metadata>& GetMetadata() const { return m_metadata; }
+        const Metadata& GetMetadata() const { return m_metadata; }
     };
 
     namespace details
@@ -106,13 +106,18 @@ namespace GE
         }
     }
 
-    template <typename CustomData = None, typename Metadata = None, typename SharedData = None>
+    template <typename Metadata = None, typename CustomData = None, typename SharedData = None>
     class AchievementBuilder
     {
         static_assert(std::is_default_constructible_v<CustomData>, "CustomData has to be default constructible");
 
         Metadata m_metadata;
-        Conditions<CustomData, SharedData> m_conditions;
+        std::vector<AchiCondition<CustomData, SharedData>> m_preconditions;
+        std::vector<AchiCondition<CustomData, SharedData>> m_activators;
+        std::vector<AchiCondition<CustomData, SharedData>> m_invariants;
+        std::vector<AchiCondition<CustomData, SharedData>> m_completers;
+        std::vector<AchiCondition<CustomData, SharedData>> m_failers;
+        std::vector<AchiCondition<CustomData, SharedData>> m_reseters;
 
     public:
         AchievementBuilder(Metadata aMetadata)
@@ -122,49 +127,57 @@ namespace GE
 
         Achievement<Metadata, CustomData, SharedData> Build()
         {
-            return Achievement<Metadata, CustomData, SharedData>(details::GetNextId(), std::move(m_metadata),
-                                                                 std::move(m_conditions));
+            return Achievement<Metadata, CustomData, SharedData>(
+                details::GetNextId(), std::move(m_metadata),
+                Conditions<CustomData, SharedData>(std::move(m_preconditions), std::move(m_activators), std::move(m_invariants),
+                                                   std::move(m_completers), std::move(m_failers), std::move(m_reseters)));
         }
 
-        AchievementBuilder& AddPrecondition(
-            std::string aDescription, const Condition<CustomData, SharedData>::Callable& aCallable, bool aOneTimeSuffice = false)
+        AchievementBuilder& AddPrecondition(std::string aDescription,
+                                            const typename Condition<CustomData, SharedData>::Callable& aCallable,
+                                            bool aOneTimeSuffice = false)
         {
-            m_conditions.AddPrecondition(std::move(aDescription), std::move(aCallable), aOneTimeSuffice);
+            m_preconditions.emplace_back(std::move(aDescription), std::move(aCallable), aOneTimeSuffice);
             return *this;
         }
 
-        AchievementBuilder& AddActivator(std::string aDescription, const Condition<CustomData, SharedData>::Callable& aCallable,
+        AchievementBuilder& AddActivator(std::string aDescription,
+                                         const typename Condition<CustomData, SharedData>::Callable& aCallable,
                                          bool aOneTimeSuffice = false)
         {
-            m_conditions.AddActivator(std::move(aDescription), std::move(aCallable), aOneTimeSuffice);
+            m_activators.emplace_back(std::move(aDescription), std::move(aCallable), aOneTimeSuffice);
             return *this;
         }
 
-        AchievementBuilder& AddInvariant(std::string aDescription, const Condition<CustomData, SharedData>::Callable& aCallable,
+        AchievementBuilder& AddInvariant(std::string aDescription,
+                                         const typename Condition<CustomData, SharedData>::Callable& aCallable,
                                          bool aOneTimeSuffice = false)
         {
-            m_conditions.AddInvariant(std::move(aDescription), std::move(aCallable), aOneTimeSuffice);
+            m_invariants.emplace_back(std::move(aDescription), std::move(aCallable), aOneTimeSuffice);
             return *this;
         }
 
-        AchievementBuilder& AddCompleter(std::string aDescription, const Condition<CustomData, SharedData>::Callable& aCallable,
+        AchievementBuilder& AddCompleter(std::string aDescription,
+                                         const typename Condition<CustomData, SharedData>::Callable& aCallable,
                                          bool aOneTimeSuffice = false)
         {
-            m_conditions.AddCompleter(std::move(aDescription), std::move(aCallable), aOneTimeSuffice);
+            m_completers.emplace_back(std::move(aDescription), std::move(aCallable), aOneTimeSuffice);
             return *this;
         }
 
-        AchievementBuilder& AddFailer(std::string aDescription, const Condition<CustomData, SharedData>::Callable& aCallable,
+        AchievementBuilder& AddFailer(std::string aDescription,
+                                      const typename Condition<CustomData, SharedData>::Callable& aCallable,
                                       bool aOneTimeSuffice = false)
         {
-            m_conditions.AddFailer(std::move(aDescription), std::move(aCallable), aOneTimeSuffice);
+            m_failers.emplace_back(std::move(aDescription), std::move(aCallable), aOneTimeSuffice);
             return *this;
         }
 
-        AchievementBuilder& AddReseter(std::string aDescription, const Condition<CustomData, SharedData>::Callable& aCallable,
+        AchievementBuilder& AddReseter(std::string aDescription,
+                                       const typename Condition<CustomData, SharedData>::Callable& aCallable,
                                        bool aOneTimeSuffice = false)
         {
-            m_conditions.AddReseter(std::move(aDescription), std::move(aCallable), aOneTimeSuffice);
+            m_reseters.emplace_back(std::move(aDescription), std::move(aCallable), aOneTimeSuffice);
             return *this;
         }
     };

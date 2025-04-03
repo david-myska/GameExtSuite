@@ -16,7 +16,7 @@ namespace GE
 
         constexpr Condition(const Callable& aCallable, bool aOneTimeSuffice = false)
             : m_callable(aCallable)
-            , m_oneTimeSuffice(oneTimeSuffice)
+            , m_oneTimeSuffice(aOneTimeSuffice)
         {
         }
 
@@ -55,8 +55,8 @@ namespace GE
     };
 
     template <typename... CallableArgs>
-    std::vector<bool> EvaluateEach(const std::vector<AchiCondition<CallableArgs...>>& aConditions, const DataAccessor& aDataAccess,
-                                   CallableArgs...& aArgs)
+    std::vector<bool> EvaluateEach(const std::vector<AchiCondition<CallableArgs...>>& aConditions,
+                                   const DataAccessor& aDataAccess, CallableArgs&... aArgs)
     {
         std::vector<bool> result;
         result.reserve(aConditions.size());
@@ -69,7 +69,7 @@ namespace GE
 
     template <typename... CallableArgs>
     bool EvaluateAnd(const std::vector<AchiCondition<CallableArgs...>>& aConditions, const DataAccessor& aDataAccess,
-                     CallableArgs...& aArgs)
+                     CallableArgs&... aArgs)
     {
         auto boolVector = EvaluateEach(aConditions, aDataAccess, aArgs...);
         return std::accumulate(boolVector.begin(), boolVector.end(), true, std::logical_and<bool>());
@@ -77,7 +77,7 @@ namespace GE
 
     template <typename... CallableArgs>
     bool EvaluateOr(const std::vector<AchiCondition<CallableArgs...>>& aConditions, const DataAccessor& aDataAccess,
-                    CallableArgs...& aArgs)
+                    CallableArgs&... aArgs)
     {
         auto boolVector = EvaluateEach(aConditions, aDataAccess, aArgs...);
         return std::accumulate(boolVector.begin(), boolVector.end(), false, std::logical_or<bool>());
@@ -118,74 +118,45 @@ namespace GE
         std::vector<AchiCondition<CallableArgs...>> m_reseters;
 
     public:
-        Conditions& AddPrecondition(std::string aDescription, const Condition<CallableArgs...>::Callable& aCallable,
-                                    bool aOneTimeSuffice = false)
+        Conditions(std::vector<AchiCondition<CallableArgs...>> preconditions,
+                   std::vector<AchiCondition<CallableArgs...>> activators, std::vector<AchiCondition<CallableArgs...>> invariants,
+                   std::vector<AchiCondition<CallableArgs...>> completers, std::vector<AchiCondition<CallableArgs...>> failers,
+                   std::vector<AchiCondition<CallableArgs...>> reseters)
+            : m_preconditions(std::move(preconditions))
+            , m_activators(std::move(activators))
+            , m_invariants(std::move(invariants))
+            , m_completers(std::move(completers))
+            , m_failers(std::move(failers))
+            , m_reseters(std::move(reseters))
         {
-            m_preconditions.push_back({std::move(aDescription), Condition<CallableArgs...>(aCallable, aOneTimeSuffice)});
-            return *this;
         }
 
-        Conditions& AddActivator(std::string aDescription, const Condition<CallableArgs...>::Callable& aCallable,
-                                 bool aOneTimeSuffice = false)
-        {
-            m_activators.push_back({std::move(aDescription), Condition<CallableArgs...>(aCallable, aOneTimeSuffice)});
-            return *this;
-        }
-
-        Conditions& AddInvariant(std::string aDescription, const Condition<CallableArgs...>::Callable& aCallable,
-                                 bool aOneTimeSuffice = false)
-        {
-            m_invariants.push_back({std::move(aDescription), Condition<CallableArgs...>(aCallable, aOneTimeSuffice)});
-            return *this;
-        }
-
-        Conditions& AddCompleter(std::string aDescription, const Condition<CallableArgs...>::Callable& aCallable,
-                                 bool aOneTimeSuffice = false)
-        {
-            m_completers.push_back({std::move(aDescription), Condition<CallableArgs...>(aCallable, aOneTimeSuffice)});
-            return *this;
-        }
-
-        Conditions& AddFailer(std::string aDescription, const Condition<CallableArgs...>::Callable& aCallable,
-                              bool aOneTimeSuffice = false)
-        {
-            m_failers.push_back({std::move(aDescription), Condition<CallableArgs...>(aCallable, aOneTimeSuffice)});
-            return *this;
-        }
-
-        Conditions& AddReseter(std::string aDescription, const Condition<CallableArgs...>::Callable& aCallable,
-                               bool aOneTimeSuffice = false)
-        {
-            m_reseters.push_back({std::move(aDescription), Condition<CallableArgs...>(aCallable, aOneTimeSuffice)});
-            return *this;
-        }
-
-        bool EvaluatePreconditions(const DataAccessor& aDataAccess, CallableArgs...& aArgs) const
+        bool EvaluatePreconditions(const DataAccessor& aDataAccess, CallableArgs&... aArgs) const
         {
             return EvaluateAnd(m_preconditions, aDataAccess, aArgs...);
         }
 
-        bool EvaluateActivators(const DataAccessor& aDataAccess, CallableArgs...& aArgs) const
+        bool EvaluateActivators(const DataAccessor& aDataAccess, CallableArgs&... aArgs) const
         {
             return EvaluateAnd(m_activators, aDataAccess, aArgs...);
         }
 
-        bool EvaluateInvariants(const DataAccessor& aDataAccess, CallableArgs...& aArgs) const
+        bool EvaluateInvariants(const DataAccessor& aDataAccess, CallableArgs&... aArgs) const
         {
             return EvaluateAnd(m_invariants, aDataAccess, aArgs...);
         }
 
-        bool EvaluateCompleters(const DataAccessor& aDataAccess, CallableArgs...& aArgs) const
+        bool EvaluateCompleters(const DataAccessor& aDataAccess, CallableArgs&... aArgs) const
         {
             return EvaluateAnd(m_completers, aDataAccess, aArgs...);
         }
 
-        bool EvaluateFailers(const DataAccessor& aDataAccess, CallableArgs...& aArgs) const
+        bool EvaluateFailers(const DataAccessor& aDataAccess, CallableArgs&... aArgs) const
         {
             return EvaluateOr(m_failers, aDataAccess, aArgs...);
         }
 
-        bool EvaluateReseters(const DataAccessor& aDataAccess, CallableArgs...& aArgs) const
+        bool EvaluateReseters(const DataAccessor& aDataAccess, CallableArgs&... aArgs) const
         {
             return EvaluateAnd(m_reseters, aDataAccess, aArgs...);
         }

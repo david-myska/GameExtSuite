@@ -1,5 +1,6 @@
 #include "ge_test.h"
 
+#include "game_enhancer/achis/achievement.h"
 #include "game_enhancer/memory_layout_builder.h"
 #include "game_enhancer/memory_processor.h"
 #include "pma/logging/console_logger.h"
@@ -35,7 +36,7 @@ namespace Raw
                                       //  moving without collision, only 1 is active
     uint8_t m_unknown11[114]    = {}; //  +02A
     uint16_t m_pathNodes[16][2] = {}; //  +09C - pathNode is struct of {xPos, yPos}
-                                        // clang-format on
+                                           // clang-format on
     };
 
 #pragma pack(pop)
@@ -58,7 +59,7 @@ namespace Raw
     uint8_t m_townPortalId            = {}; //+48	Object UniqueID for TownPortals
     uint8_t m_unknown5[0x53]          = {}; //+49
     uint32_t m_pNetClient             = {}; //+9C	ptClient
-                                  // clang-format on
+                                     // clang-format on
     };
 
 #pragma pack(pop)
@@ -187,7 +188,7 @@ namespace Raw
     uint32_t m_pPrevUnitInRoom = {}; //  +0E8 - pPrevUnitInRoom - the previous unit in the current room
     uint32_t m_pMsgFirst       = {}; //  +0EC - pMsgFirst
     uint32_t m_pMsgLast        = {}; //  +0F0 - pMsgLast
-                                // clang-format on
+                                   // clang-format on
     };
 
 #pragma pack(pop)
@@ -241,12 +242,15 @@ namespace Raw
     uint32_t m_bUberBaal             = {}; //  +1DE8 - bUberBaal - killed uber baal
     uint32_t m_bUberDiablo           = {}; //  +1DEC - bUberDiablo - killed uber diablo
     uint32_t m_bUberMephisto         = {}; //  +1DF0 - bUberMephisto - killed uber mephisto
-                                     // clang-format on
+                                        // clang-format on
     };
 
 #pragma pack(pop)
 
 }  // namespace Raw
+
+template <typename T>
+using CustomAchiBuilder = GE::AchievementBuilder<T, int, std::string>;
 
 TEST_F(GE_Tests, Test)
 {
@@ -290,4 +294,11 @@ TEST_F(GE_Tests, Test)
     std::cout << "Sleeping for 60s" << std::endl;
     std::this_thread::sleep_for(std::chrono::seconds(60));
     std::cout << "Done sleeping" << std::endl;
+
+    auto achiTest = GE::AchievementBuilder({}).Build();
+
+    struct A
+    {
+    };
+    auto customAchiTest = CustomAchiBuilder(A{});
 }
