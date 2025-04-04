@@ -47,16 +47,41 @@ namespace GE
         mutable bool m_evaluatedToTrue = false;
     };
 
-    template <typename... CallableArgs>
-    struct AchiCondition
+    enum class ConditionType
     {
-        std::string m_description;
-        Condition<CallableArgs...> m_condition;
+        /*
+         * All preconditions need to be met before activators start trying.
+         * Commonly used to filter achievements according to very general requirements.
+         * Level, location, story progress...
+         */
+        Precondition,
+        /*
+         * All activators need to evaluate to true at the same time to activate the achievement.
+         */
+        Activator,
+        /*
+         * All invariants need to evaluate to true on each update.
+         * If not, the achievement is marked as Failed.
+         * Invariants are just a special case of failers.
+         */
+        Invariant,
+        /*
+         * When all completers evaluate to true at the same time, the achievemnt is marked as Completed.
+         */
+        Completer,
+        /*
+         * Any failer evaluating to true causes the achievement to be marked as Failed.
+         */
+        Failer,
+        /*
+         * When all reseters evaluate to true, achievement can change status from Failed to Inactive.
+         */
+        Reseter,
     };
 
     template <typename... CallableArgs>
-    std::vector<bool> EvaluateEach(const std::vector<AchiCondition<CallableArgs...>>& aConditions,
-                                   const DataAccessor& aDataAccess, CallableArgs&... aArgs)
+    std::vector<bool> EvaluateEach(const std::vector<Condition<CallableArgs...>>& aConditions, const DataAccessor& aDataAccess,
+                                   CallableArgs&... aArgs)
     {
         std::vector<bool> result;
         result.reserve(aConditions.size());
@@ -67,98 +92,44 @@ namespace GE
         return result;
     }
 
-    template <typename... CallableArgs>
-    bool EvaluateAnd(const std::vector<AchiCondition<CallableArgs...>>& aConditions, const DataAccessor& aDataAccess,
-                     CallableArgs&... aArgs)
+    bool EvaluateAnd(const std::vector<bool>& aBoolVector)
     {
-        auto boolVector = EvaluateEach(aConditions, aDataAccess, aArgs...);
-        return std::accumulate(boolVector.begin(), boolVector.end(), true, std::logical_and<bool>());
+        return std::accumulate(aBoolVector.begin(), aBoolVector.end(), true, std::logical_and<bool>());
     }
 
-    template <typename... CallableArgs>
-    bool EvaluateOr(const std::vector<AchiCondition<CallableArgs...>>& aConditions, const DataAccessor& aDataAccess,
-                    CallableArgs&... aArgs)
+    bool EvaluateOr(const std::vector<bool>& aBoolVector)
     {
-        auto boolVector = EvaluateEach(aConditions, aDataAccess, aArgs...);
-        return std::accumulate(boolVector.begin(), boolVector.end(), false, std::logical_or<bool>());
+        return std::accumulate(aBoolVector.begin(), aBoolVector.end(), false, std::logical_or<bool>());
     }
 
     template <typename... CallableArgs>
     class Conditions
     {
-        /*
-         * All preconditions need to be met before activators start trying.
-         * Commonly used to filter achievements according to very general requirements.
-         * Level, location, story progress...
-         */
-        std::vector<AchiCondition<CallableArgs...>> m_preconditions;
-        /*
-         * All activators need to evaluate to true at the same time to activate the achievement.
-         */
-        std::vector<AchiCondition<CallableArgs...>> m_activators;
-        /*
-         * All invariants need to evaluate to true on each update.
-         * If not, the achievement is marked as Failed.
-         * Invariants are just a special case of failers.
-         */
-        std::vector<AchiCondition<CallableArgs...>> m_invariants;
-
-        /*
-         * When all completers evaluate to true at the same time, the achievemnt is marked as Completed.
-         */
-        std::vector<AchiCondition<CallableArgs...>> m_completers;
-        /*
-         * Any failer evaluating to true causes the achievement to be marked as Failed.
-         */
-        std::vector<AchiCondition<CallableArgs...>> m_failers;
-
-        /*
-         * When all reseters evaluate to true, achievement can change status from Failed to Inactive.
-         */
-        std::vector<AchiCondition<CallableArgs...>> m_reseters;
+        std::unordered_map<ConditionType, std::vector<Condition<CallableArgs...>>> m_conditionsMap;
 
     public:
-        Conditions(std::vector<AchiCondition<CallableArgs...>> preconditions,
-                   std::vector<AchiCondition<CallableArgs...>> activators, std::vector<AchiCondition<CallableArgs...>> invariants,
-                   std::vector<AchiCondition<CallableArgs...>> completers, std::vector<AchiCondition<CallableArgs...>> failers,
-                   std::vector<AchiCondition<CallableArgs...>> reseters)
-            : m_preconditions(std::move(preconditions))
-            , m_activators(std::move(activators))
-            , m_invariants(std::move(invariants))
-            , m_completers(std::move(completers))
-            , m_failers(std::move(failers))
-            , m_reseters(std::move(reseters))
+        Conditions(std::vector<Condition<CallableArgs...>> preconditions, std::vector<Condition<CallableArgs...>> activators,
+                   std::vector<Condition<CallableArgs...>> invariants, std::vector<Condition<CallableArgs...>> completers,
+                   std::vector<Condition<CallableArgs...>> failers, std::vector<Condition<CallableArgs...>> reseters)
+            : m_conditionsMap({
+                  {ConditionType::Precondition, std::move(preconditions)},
+                  {ConditionType::Activator,    std::move(activators)   },
+                  {ConditionType::Invariant,    std::move(invariants)   },
+                  {ConditionType::Completer,    std::move(completers)   },
+                  {ConditionType::Failer,       std::move(failers)      },
+                  {ConditionType::Reseter,      std::move(reseters)     },
+        })
         {
         }
 
-        bool EvaluatePreconditions(const DataAccessor& aDataAccess, CallableArgs&... aArgs) const
+        Conditions(std::unordered_map<ConditionType, std::vector<Condition<CallableArgs...>>> aConditionsMap)
+            : m_conditionsMap(std::move(aConditionsMap))
         {
-            return EvaluateAnd(m_preconditions, aDataAccess, aArgs...);
         }
 
-        bool EvaluateActivators(const DataAccessor& aDataAccess, CallableArgs&... aArgs) const
+        std::vector<bool> Evaluate(ConditionType aConditionType, const DataAccessor& aDataAccess, CallableArgs&... aArgs) const
         {
-            return EvaluateAnd(m_activators, aDataAccess, aArgs...);
-        }
-
-        bool EvaluateInvariants(const DataAccessor& aDataAccess, CallableArgs&... aArgs) const
-        {
-            return EvaluateAnd(m_invariants, aDataAccess, aArgs...);
-        }
-
-        bool EvaluateCompleters(const DataAccessor& aDataAccess, CallableArgs&... aArgs) const
-        {
-            return EvaluateAnd(m_completers, aDataAccess, aArgs...);
-        }
-
-        bool EvaluateFailers(const DataAccessor& aDataAccess, CallableArgs&... aArgs) const
-        {
-            return EvaluateOr(m_failers, aDataAccess, aArgs...);
-        }
-
-        bool EvaluateReseters(const DataAccessor& aDataAccess, CallableArgs&... aArgs) const
-        {
-            return EvaluateAnd(m_reseters, aDataAccess, aArgs...);
+            return EvaluateEach(m_conditionsMap[aConditionType], aDataAccess, aArgs...);
         }
     };
 }

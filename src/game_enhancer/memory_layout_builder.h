@@ -35,7 +35,7 @@ namespace GE
             template <typename T>
             Absolute& AddPointerOffsets(size_t aOffset, const std::function<std::string(T*)>& aDynamicType, size_t aCount = 1)
             {
-                AddPointerOffsets(
+                return AddPointerOffsets(
                     aOffset,
                     [aDynamicType](void* aPtr) {
                         return aDynamicType(static_cast<T*>(aPtr));
@@ -46,7 +46,7 @@ namespace GE
             template <typename T>
             Absolute& AddPointerOffsets(size_t aOffset, const std::function<size_t(T*)>& aDynamicSize, size_t aCount = 1)
             {
-                AddPointerOffsets(
+                return AddPointerOffsets(
                     aOffset,
                     [aDynamicSize](void* aPtr) {
                         return aDynamicSize(static_cast<T*>(aPtr));
