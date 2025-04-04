@@ -12,7 +12,7 @@ namespace GE
     template <typename... CallableArgs>
     struct Condition
     {
-        using Callable = std::function<bool(const DataAccessor&, CallableArgs&...)>;
+        using Callable = std::function<bool(const DataAccessor&, CallableArgs&&...)>;
 
         constexpr Condition(const Callable& aCallable, bool aOneTimeSuffice = false)
             : m_callable(aCallable)
@@ -22,7 +22,7 @@ namespace GE
 
         bool ForceEvaluate(const DataAccessor& aDataAccess, CallableArgs&&... aCallableArgs) const
         {
-            return m_evaluatedToTrue = m_func(aDataAccess, std::forward<CallableArgs>(aCallableArgs)...);
+            return m_evaluatedToTrue = m_callable(aDataAccess, std::forward<CallableArgs>(aCallableArgs)...);
         }
 
         bool Evaluate(const DataAccessor& aDataAccess, CallableArgs&&... aCallableArgs) const
@@ -77,17 +77,21 @@ namespace GE
          * When all reseters evaluate to true, achievement can change status from Failed to Inactive.
          */
         Reseter,
+        /*
+         * Helper value that allows to iterate over the enum.
+         */
+        All
     };
 
     template <typename... CallableArgs>
     std::vector<bool> EvaluateEach(const std::vector<Condition<CallableArgs...>>& aConditions, const DataAccessor& aDataAccess,
-                                   CallableArgs&... aArgs)
+                                   CallableArgs&&... aArgs)
     {
         std::vector<bool> result;
         result.reserve(aConditions.size());
         for (const auto& c : aConditions)
         {
-            result.push_back(c.m_condition.Evaluate(aDataAccess, aArgs...));
+            result.push_back(c.Evaluate(aDataAccess, std::forward<CallableArgs>(aArgs)...));
         }
         return result;
     }
@@ -127,9 +131,9 @@ namespace GE
         {
         }
 
-        std::vector<bool> Evaluate(ConditionType aConditionType, const DataAccessor& aDataAccess, CallableArgs&... aArgs) const
+        std::vector<bool> Evaluate(ConditionType aConditionType, const DataAccessor& aDataAccess, CallableArgs&&... aArgs) const
         {
-            return EvaluateEach(m_conditionsMap[aConditionType], aDataAccess, aArgs...);
+            return EvaluateEach(m_conditionsMap.at(aConditionType), aDataAccess, std::forward<CallableArgs>(aArgs)...);
         }
     };
 }

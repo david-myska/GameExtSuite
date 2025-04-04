@@ -168,8 +168,21 @@ namespace GE
 
     void MemoryProcessorImpl::Stop()
     {
+        RequestStop();
+        if (m_updateThread.joinable())
+        {
+            m_updateThread.join();
+        }
+    }
+
+    void MemoryProcessorImpl::RequestStop()
+    {
         m_onAttachedToken.reset();
         m_updateThread.request_stop();
+    }
+
+    void MemoryProcessorImpl::Wait()
+    {
         if (m_updateThread.joinable())
         {
             m_updateThread.join();

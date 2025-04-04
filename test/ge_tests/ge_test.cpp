@@ -522,6 +522,61 @@ void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
     aMemoryProcessor.RegisterLayout("UnitData", unitLayout);
 }
 
+std::string ToString(const GE::ConditionType aType)
+{
+    switch (aType)
+    {
+    case GE::ConditionType::Precondition:
+        return "Precondition";
+    case GE::ConditionType::Activator:
+        return "Activator";
+    case GE::ConditionType::Invariant:
+        return "Invariant";
+    case GE::ConditionType::Completer:
+        return "Completer";
+    case GE::ConditionType::Failer:
+        return "Failer";
+    case GE::ConditionType::Reseter:
+        return "Reseter";
+    default:
+        return "Unknown";
+    }
+    return "Unknown";
+}
+
+void PrintAchievement(const TestAchievement& aAchievement)
+{
+    std::cout << "--- " << aAchievement->GetMetadata() << " ---" << std::endl;
+    for (uint32_t i = 0; i < static_cast<uint32_t>(GE::ConditionType::All); ++i)
+    {
+        auto cType = static_cast<GE::ConditionType>(i);
+        std::cout << ToString(cType) << ": ";
+        const auto& names = aAchievement->GetConditionNames(cType);
+        const auto& results = aAchievement->GetConditionResults(cType);
+        for (uint32_t j = 0; j < names.size(); ++j)
+        {
+            std::cout << names[j] << "[" << results[j] << "], ";
+        }
+        std::cout << std::endl;
+    }
+}
+
+void PrintAchievements(const std::vector<TestAchievement>& aAchievements)
+{
+    for (const auto& a : aAchievements)
+    {
+        PrintAchievement(a);
+        std::cout << "\n-----\n" << std::endl;
+    }
+}
+
+std::vector<TestAchievement> GetAchievements()
+{
+    std::vector<TestAchievement> achis;
+    achis.push_back(TestAchiBuilder("Name").Build());
+    return achis;
+}
+
 TEST_F(GE_Tests, Test)
 {
     // PMA::Setup::InjectLogger(std::make_unique<PMA::ConsoleLogger>(), PMA::LogLevel::Verbose);
@@ -541,23 +596,27 @@ TEST_F(GE_Tests, Test)
         return address;
     });
     memoryProcessor->Initialize();
-    memoryProcessor->SetUpdateCallback(1000, [](const GE::DataAccessor& aFrameAccessor) {
-        auto frames = aFrameAccessor.Get2Frames<Raw::Game>("Game");
-        auto game = std::get<0>(frames);
+
+    std::cout << "Creating achievements" << std::endl;
+    auto achis = GetAchievements();
+
+    memoryProcessor->SetUpdateCallback(1000, [&achis, &memoryProcessor](const GE::DataAccessor& aDataAccess) {
+        GE::None sharedState;
+        for (auto& a : achis)
+        {
+            a->Update(aDataAccess, sharedState);
+        }
+        PrintAchievements(achis);
+        if (std::all_of(achis.begin(), achis.end(), [&memoryProcessor](const auto& a) {
+                return a->GetStatus() == GE::Status::Completed || a->GetStatus() == GE::Status::Failed;
+            }))
+        {
+            std::cout << "All achievements completed" << std::endl;
+            memoryProcessor->RequestStop();
+        }
     });
+
     std::cout << "Starting memoryProcessor" << std::endl;
     memoryProcessor->Start();
-
-    std::vector<TestAchievement> achis;
-    achis.push_back(TestAchiBuilder("Name").Build());
-
-    while (!achis.empty())
-    {
-        // Printing part
-        for (const auto& a : achis)
-        {
-            std::cout << "--- " << a.GetMetadata() << " ---" << std::endl;
-        }
-        std::cout << "\n-----\n";
-    }
+    memoryProcessor->Wait();
 }

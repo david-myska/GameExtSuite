@@ -46,6 +46,8 @@ namespace GE
         void SetUpdateCallback(size_t aRateMs, const std::function<void(const DataAccessor&)>& aCallback) override;
         void Start() override;
         void Stop() override;
+        void RequestStop() override;
+        void Wait() override;
 
         void AddStarterLayout(const std::string& aType,
                               const std::function<size_t(PMA::MemoryAccessPtr aMemoryAccess)>& aCallback) override;
