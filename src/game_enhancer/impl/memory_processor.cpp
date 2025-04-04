@@ -8,6 +8,7 @@
 #include <unordered_map>
 
 #include "game_enhancer/impl/data_accessor.h"
+#include "game_enhancer/memory_layout_builder.h"
 
 namespace GE
 {
@@ -43,13 +44,19 @@ namespace GE
         }
     }
 
+    uint8_t* MemoryProcessorImpl::ReadData(size_t aBytes, size_t aFromAddress, FrameMemoryStorage& aCurrentFrameStorage)
+    {
+        uint8_t* storagePtr = aCurrentFrameStorage.Allocate(aBytes);
+        GetMetadata(storagePtr)->m_realAddress = aFromAddress;
+        m_memoryAccess->Read(aFromAddress, storagePtr, aBytes);
+        return storagePtr;
+    }
+
     uint8_t* MemoryProcessorImpl::ReadLayout(const std::string& aLayoutType, size_t aFromAddress,
                                              std::unordered_map<size_t, uint8_t*>& aPointerMap,
                                              FrameMemoryStorage& aCurrentFrameStorage)
     {
-        uint8_t* storagePtr = aCurrentFrameStorage.Allocate(m_layouts[aLayoutType].first);
-        GetMetadata(storagePtr)->m_realAddress = aFromAddress;
-        m_memoryAccess->Read(aFromAddress, storagePtr, m_layouts.at(aLayoutType).first);
+        uint8_t* storagePtr = ReadData(m_layouts[aLayoutType].first, aFromAddress, aCurrentFrameStorage);
         for (const auto& ptr : m_layouts[aLayoutType].second)
         {
             for (size_t i = 0; i < ptr.m_count; ++i)
@@ -62,10 +69,19 @@ namespace GE
                 }
                 if (!aPointerMap.contains(pointerAddress))
                 {
-                    aPointerMap[pointerAddress] = ReadLayout(ptr.m_pointeeType, pointerAddress, aPointerMap,
-                                                             aCurrentFrameStorage);
+                    if (std::holds_alternative<LayoutBuilder::DynamicLayoutFnc>(ptr.m_pointeeType))
+                    {
+                        auto& dynamicLayoutFnc = std::get<LayoutBuilder::DynamicLayoutFnc>(ptr.m_pointeeType);
+                        aPointerMap[pointerAddress] = ReadLayout(dynamicLayoutFnc(storagePtr), pointerAddress, aPointerMap,
+                                                                 aCurrentFrameStorage);
+                    }
+                    else
+                    {
+                        auto& dynamicDataFnc = std::get<LayoutBuilder::DynamicDataFnc>(ptr.m_pointeeType);
+                        aPointerMap[pointerAddress] = ReadData(dynamicDataFnc(storagePtr), pointerAddress, aCurrentFrameStorage);
+                    }
+                    *castedPtr = reinterpret_cast<size_t>(aPointerMap[pointerAddress]);
                 }
-                *castedPtr = reinterpret_cast<size_t>(aPointerMap[pointerAddress]);
             }
         }
         return storagePtr;

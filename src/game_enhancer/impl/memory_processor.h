@@ -33,6 +33,7 @@ namespace GE
         std::atomic<bool> m_running = false;
 
         void Update();
+        uint8_t* ReadData(size_t aBytes, size_t aFromAddress, FrameMemoryStorage& aCurrentFrameStorage);
         uint8_t* ReadLayout(const std::string& aLayoutType, size_t aFromAddress,
                             std::unordered_map<size_t, uint8_t*>& aPointerMap, FrameMemoryStorage& aCurrentFrameStorage);
         void EnsureNotRunning() const;

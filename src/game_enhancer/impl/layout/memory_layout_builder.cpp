@@ -13,9 +13,31 @@ namespace GE
         return *this;
     }
 
-    AbsoluteImpl& AbsoluteImpl::AddPointerOffsets(size_t aOffset, const std::string& aPointeeType, size_t aCount)
+    AbsoluteImpl& AbsoluteImpl::AddPointerOffsets(size_t aOffset, const std::string& aStaticType, size_t aCount)
     {
-        m_pointerOffsets.push_back({aOffset, aCount, aPointeeType});
+        m_pointerOffsets.push_back({aOffset, aCount, [aStaticType](void*) {
+                                        return aStaticType;
+                                    }});
+        return *this;
+    }
+
+    AbsoluteImpl& AbsoluteImpl::AddPointerOffsets(size_t aOffset, const std::function<std::string(void*)>& aDynamicType, size_t aCount)
+    {
+        m_pointerOffsets.push_back({aOffset, aCount, aDynamicType});
+        return *this;
+    }
+
+    AbsoluteImpl& AbsoluteImpl::AddPointerOffsets(size_t aOffset, size_t aStaticSize, size_t aCount)
+    {
+        m_pointerOffsets.push_back({aOffset, aCount, [aStaticSize](void*) {
+                                        return aStaticSize;
+                                    }});
+        return *this;
+    }
+
+    AbsoluteImpl& AbsoluteImpl::AddPointerOffsets(size_t aOffset, const std::function<size_t(void*)>& aDynamicSize, size_t aCount)
+    {
+        m_pointerOffsets.push_back({aOffset, aCount, aDynamicSize});
         return *this;
     }
 
