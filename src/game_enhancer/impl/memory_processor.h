@@ -29,8 +29,11 @@ namespace GE
 
         size_t m_refreshRateMs = 100;
         std::jthread m_updateThread;
-        std::function<void(const DataAccessor&)> m_callback;
+        std::function<void(const DataAccessor&)> m_updateCallback;
         std::atomic<bool> m_running = false;
+
+        std::shared_ptr<DataAccessor> m_dataAccessor;
+        std::function<void(std::shared_ptr<DataAccessor>)> m_onReadyCallback;
 
         void Update();
         uint8_t* ReadData(size_t aBytes, size_t aFromAddress, FrameMemoryStorage& aCurrentFrameStorage);
@@ -38,12 +41,15 @@ namespace GE
                             std::unordered_map<size_t, uint8_t*>& aPointerMap, FrameMemoryStorage& aCurrentFrameStorage);
         void EnsureNotRunning() const;
 
+        void ResetStoredData();
+
     public:
         MemoryProcessorImpl(PMA::TargetProcessPtr aTargetProcess);
         ~MemoryProcessorImpl();
 
         void RegisterLayout(const std::string& aLayoutType, LayoutBuilder::Absolute::Layout aLayout) override;
         void SetUpdateCallback(size_t aRateMs, const std::function<void(const DataAccessor&)>& aCallback) override;
+        void SetOnReadyCallback(const std::function<void(std::shared_ptr<DataAccessor>)>& aCallback) override;
         void Start() override;
         void Stop() override;
         void RequestStop() override;

@@ -20,7 +20,7 @@ namespace GE
     {
     }
 
-    const uint8_t* DataAccessorImpl::GetFrameImpl(const std::string& aLayout, size_t aFrameIdx) const
+    const uint8_t* DataAccessorImpl::GetRaw(const std::string& aLayout, size_t aFrameIdx) const
     {
         return EnsureValid()->at(aFrameIdx).GetLayoutBase(aLayout);
     }

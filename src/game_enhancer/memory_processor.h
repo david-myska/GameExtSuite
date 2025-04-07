@@ -29,7 +29,8 @@ namespace GE
         // virtual void RegisterLayout(const std::string& aType, LayoutBuilder::Relative::Layout aLayout) = 0;
 
         /*
-         * aRateMs Sets update rate of a new frame.
+         * Update callback is called for the first time after the first 'FramesToKeep' frames were read.
+         * After that, it is called every 'aRateMs' milliseconds.
          * Calculation from FrameRate to UpdateRate: 1000 / FrameRate
          */
         virtual void SetUpdateCallback(size_t aRateMs, const std::function<void(const DataAccessor&)>& aCallback) = 0;
@@ -54,6 +55,12 @@ namespace GE
          * Prepares required memory, might do some optimizations, etc.
          */
         virtual void Initialize() = 0;
+
+        /*
+         * OnReady callback is called after MemoryProcessor successfully started main loop and first 'FramesToKeep' frames were
+         * read. In this callback, setup the SharedState and any helper classes that require DataAccessor to be fully initialized.
+         */
+        virtual void SetOnReadyCallback(const std::function<void(std::shared_ptr<DataAccessor>)>& aCallback) = 0;
 
         /*
          * Starts the main loop. OnRefresh callbacks will be called at the specified refresh rate.

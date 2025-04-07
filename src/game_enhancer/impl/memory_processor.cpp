@@ -32,9 +32,15 @@ namespace GE
             return;
         }
 
+        if (!m_dataAccessor)
+        {
+            m_dataAccessor = std::make_shared<DataAccessorImpl>(m_storedFrames);
+            m_onReadyCallback(m_dataAccessor);
+        }
+
         try
         {
-            m_callback(DataAccessorImpl(m_storedFrames));
+            m_updateCallback(*m_dataAccessor);
         }
         catch (const std::exception& e)
         {
@@ -109,7 +115,13 @@ namespace GE
     {
         EnsureNotRunning();
         m_refreshRateMs = aRateMs;
-        m_callback = aCallback;
+        m_updateCallback = aCallback;
+    }
+
+    void MemoryProcessorImpl::SetOnReadyCallback(const std::function<void(std::shared_ptr<DataAccessor>)>& aCallback)
+    {
+        EnsureNotRunning();
+        m_onReadyCallback = aCallback;
     }
 
     void MemoryProcessorImpl::EnsureNotRunning() const
@@ -120,10 +132,15 @@ namespace GE
         }
     }
 
+    void MemoryProcessorImpl::ResetStoredData() {
+        m_dataAccessor.reset();
+        m_storedFrames->clear();
+    }
+
     void MemoryProcessorImpl::Start()
     {
         EnsureNotRunning();
-        if (!m_callback)
+        if (!m_updateCallback)
         {
             throw std::runtime_error("No update callback set!");
         }
@@ -160,6 +177,7 @@ namespace GE
                     }
                     std::this_thread::sleep_until(frameStartTime + std::chrono::milliseconds(m_refreshRateMs));
                 }
+                ResetStoredData();
                 m_running = false;
             });
         });

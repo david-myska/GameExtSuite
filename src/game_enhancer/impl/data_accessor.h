@@ -17,6 +17,6 @@ namespace GE
 
     public:
         DataAccessorImpl(std::weak_ptr<std::deque<FrameMemoryStorage>> aWeakFrameStorage);
-        const uint8_t* GetFrameImpl(const std::string& aLayout, size_t aFrameIdx) const override;
+        const uint8_t* GetRaw(const std::string& aLayout, size_t aFrameIdx = 0) const override;
     };
 }
