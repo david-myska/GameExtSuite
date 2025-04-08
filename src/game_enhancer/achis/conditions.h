@@ -12,7 +12,7 @@ namespace GE
     template <typename... CallableArgs>
     struct Condition
     {
-        using Callable = std::function<bool(const DataAccessor&, CallableArgs&&...)>;
+        using Callable = std::function<bool(CallableArgs&&...)>;
 
         constexpr Condition(const Callable& aCallable, bool aOneTimeSuffice = false)
             : m_callable(aCallable)
@@ -20,18 +20,18 @@ namespace GE
         {
         }
 
-        bool ForceEvaluate(const DataAccessor& aDataAccess, CallableArgs&&... aCallableArgs) const
+        bool ForceEvaluate(CallableArgs&&... aCallableArgs) const
         {
-            return m_evaluatedToTrue = m_callable(aDataAccess, std::forward<CallableArgs>(aCallableArgs)...);
+            return m_evaluatedToTrue = m_callable(std::forward<CallableArgs>(aCallableArgs)...);
         }
 
-        bool Evaluate(const DataAccessor& aDataAccess, CallableArgs&&... aCallableArgs) const
+        bool Evaluate(CallableArgs&&... aCallableArgs) const
         {
             if (CanSkipEvaluation())
             {
                 return true;
             }
-            return ForceEvaluate(aDataAccess, std::forward<CallableArgs>(aCallableArgs)...);
+            return ForceEvaluate(std::forward<CallableArgs>(aCallableArgs)...);
         }
 
         bool IsOneTimeSuffice() const { return m_oneTimeSuffice; }
@@ -84,14 +84,14 @@ namespace GE
     };
 
     template <typename... CallableArgs>
-    std::vector<bool> EvaluateEach(const std::vector<Condition<CallableArgs...>>& aConditions, const DataAccessor& aDataAccess,
+    std::vector<bool> EvaluateEach(const std::vector<Condition<CallableArgs...>>& aConditions,
                                    CallableArgs&&... aArgs)
     {
         std::vector<bool> result;
         result.reserve(aConditions.size());
         for (const auto& c : aConditions)
         {
-            result.push_back(c.Evaluate(aDataAccess, std::forward<CallableArgs>(aArgs)...));
+            result.push_back(c.Evaluate(std::forward<CallableArgs>(aArgs)...));
         }
         return result;
     }
@@ -131,9 +131,9 @@ namespace GE
         {
         }
 
-        std::vector<bool> Evaluate(ConditionType aConditionType, const DataAccessor& aDataAccess, CallableArgs&&... aArgs) const
+        std::vector<bool> Evaluate(ConditionType aConditionType, CallableArgs&&... aArgs) const
         {
-            return EvaluateEach(m_conditionsMap.at(aConditionType), aDataAccess, std::forward<CallableArgs>(aArgs)...);
+            return EvaluateEach(m_conditionsMap.at(aConditionType), std::forward<CallableArgs>(aArgs)...);
         }
     };
 }

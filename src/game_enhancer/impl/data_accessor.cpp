@@ -1,3 +1,4 @@
+#include "data_accessor.h"
 #pragma once
 
 #include "data_accessor.h"
@@ -23,5 +24,10 @@ namespace GE
     const uint8_t* DataAccessorImpl::GetRaw(const std::string& aLayout, size_t aFrameIdx) const
     {
         return EnsureValid()->at(aFrameIdx).GetLayoutBase(aLayout);
+    }
+
+    size_t DataAccessorImpl::GetNumberOfFrames() const
+    {
+        return EnsureValid()->size();
     }
 }

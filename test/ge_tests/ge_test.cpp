@@ -25,7 +25,7 @@ namespace Raw
     {
         // clang-format off
                                 // sizeof = 0x8
-    uint32_t m_pStats     = {};
+    Stat* m_pStats     = {};
     uint16_t m_count      = {};
     uint16_t m_sizeInBits = {};
         // clang-format on
@@ -56,7 +56,7 @@ namespace Raw
     uint32_t m_pPrevious              = {}; //  +034 - pPrevious - previous list overall
     uint32_t m_functionExpireCallback = {}; //  +038 - fpStatExpires(); - function to call when the list is removed (void * __fastcall)(pUnit,stateNo,BOOL);
     uint32_t m_pNext                  = {}; //  +03C - pNext - next list overall
-                             // clang-format on
+                                // clang-format on
     };
 
     struct StatListEx
@@ -80,7 +80,7 @@ namespace Raw
     uint32_t m_pStatFlags       = {}; //  +058 - StatFlags[] (pointer to array)
     uint32_t m_functionCallback = {}; //  +05C - fCallback (function to call by SetStat, AddStat when a fcallback stat changes)
     uint32_t m_pGame            = {}; //  +060 - pGame (on server)
-                             // clang-format on
+                                // clang-format on
     };
 
 #pragma pack(pop)
@@ -103,11 +103,58 @@ namespace Raw
     uint32_t m_filledSocketsCount = {}; //  +028 - nFilledSockets
     uint32_t m_pFirstCorpse       = {}; //  +034 - pFirstCorpse - ptr to first corpse structure
     uint32_t m_nextCorpseGUID     = {}; //  +03C - NextCorpseGUID
+                                         // clang-format on
+    };
+
+    struct StaticPath
+    {
+        // clang-format off
+                                      //  sizeof = 0x20
+    uint32_t m_outerWorld      = {};  //  +000 - is non-zero when dropped
+    uint16_t m_unknown2        = {};  //  +004 - is set when dropped
+    uint16_t m_unknown3        = {};  //  +006 - is set when dropped, always seems to be -1
+    uint16_t m_unknown4        = {};  //  +008 - is set when dropped
+    uint16_t m_unknown5        = {};  //  +00A - is set when dropped, always seems to be 1
+    uint16_t m_xPos            = {};  //  +00C - x position in the world/in the inventory/when equipped
+    uint16_t m_unknown6        = {};  //  +00E - always zero
+    uint16_t m_yPos            = {};  //  +010 - y position in the world/in the inventory/(when equipped is 0)
+    uint16_t m_unknown7        = {};  //  +012 - always zero
+    uint8_t  m_unknown8[12]    = {};  //  +014
                                       // clang-format on
+    };
+
+    struct DynamicPath
+    {
+        // clang-format off
+                                      //  sizeof = 220
+    uint16_t m_unknown1        = {};  //  +000
+    uint16_t m_xPos            = {};  //  +002 - current X position
+    uint16_t m_unknown2        = {};  //  +004
+    uint16_t m_yPos            = {};  //  +006 - current Y position
+    uint16_t m_unknown3        = {};  //  +008
+    uint16_t m_unknown4        = {};  //  +00A - always seems to be -1
+    uint16_t m_unknown5        = {};  //  +00C
+    uint16_t m_unknown6        = {};  //  +00E - always seems to be 1
+    uint16_t m_xTargetPos      = {};  //  +010 - final destination of the unit on the x-axis
+    uint16_t m_yTargetPos      = {};  //  +012 - final destination of the unit on the y-axis
+    uint16_t m_xTargetPos2     = {};  //  +014 - same
+    uint16_t m_yTargetPos2     = {};  //  +016 - same
+    uint16_t m_xTargetPos3     = {};  //  +018 - same
+    uint16_t m_yTargetPos3     = {};  //  +01A - same
+    uint16_t m_unknown7        = {};  //  +01C
+    uint16_t m_unknown8        = {};  //  +01E
+    uint32_t m_unknown9        = {};  //  +020
+    uint32_t m_unknown10       = {};  //  +024
+    uint16_t m_activePathNodes = {};  //  +028 - when colliding more are active to find a way, when
+                                      //  moving without collision, only 1 is active
+    uint8_t m_unknown11[114]    = {}; //  +02A
+    uint16_t m_pathNodes[16][2] = {}; //  +09C - pathNode is struct of {xPos, yPos}
+                                           // clang-format on
     };
 
     struct ItemData
     {
+        using Path = StaticPath;
         // clang-format off
                                          //  sizeof = 0x74
     uint32_t m_quality = {};             //  +000 - qualityNo;
@@ -161,54 +208,9 @@ namespace Raw
         // clang-format on
     };
 
-    struct StaticPath
-    {
-        // clang-format off
-                                      //  sizeof = 0x20
-    uint32_t m_outerWorld      = {};  //  +000 - is non-zero when dropped
-    uint16_t m_unknown2        = {};  //  +004 - is set when dropped
-    uint16_t m_unknown3        = {};  //  +006 - is set when dropped, always seems to be -1
-    uint16_t m_unknown4        = {};  //  +008 - is set when dropped
-    uint16_t m_unknown5        = {};  //  +00A - is set when dropped, always seems to be 1
-    uint16_t m_xPos            = {};  //  +00C - x position in the world/in the inventory/when equipped
-    uint16_t m_unknown6        = {};  //  +00E - always zero
-    uint16_t m_yPos            = {};  //  +010 - y position in the world/in the inventory/(when equipped is 0)
-    uint16_t m_unknown7        = {};  //  +012 - always zero
-    uint8_t  m_unknown8[12]    = {};  //  +014
-                                   // clang-format on
-    };
-
-    struct DynamicPath
-    {
-        // clang-format off
-                                      //  sizeof = 220
-    uint16_t m_unknown1        = {};  //  +000
-    uint16_t m_xPos            = {};  //  +002 - current X position
-    uint16_t m_unknown2        = {};  //  +004
-    uint16_t m_yPos            = {};  //  +006 - current Y position
-    uint16_t m_unknown3        = {};  //  +008
-    uint16_t m_unknown4        = {};  //  +00A - always seems to be -1
-    uint16_t m_unknown5        = {};  //  +00C
-    uint16_t m_unknown6        = {};  //  +00E - always seems to be 1
-    uint16_t m_xTargetPos      = {};  //  +010 - final destination of the unit on the x-axis
-    uint16_t m_yTargetPos      = {};  //  +012 - final destination of the unit on the y-axis
-    uint16_t m_xTargetPos2     = {};  //  +014 - same
-    uint16_t m_yTargetPos2     = {};  //  +016 - same
-    uint16_t m_xTargetPos3     = {};  //  +018 - same
-    uint16_t m_yTargetPos3     = {};  //  +01A - same
-    uint16_t m_unknown7        = {};  //  +01C
-    uint16_t m_unknown8        = {};  //  +01E
-    uint32_t m_unknown9        = {};  //  +020
-    uint32_t m_unknown10       = {};  //  +024
-    uint16_t m_activePathNodes = {};  //  +028 - when colliding more are active to find a way, when
-                                      //  moving without collision, only 1 is active
-    uint8_t m_unknown11[114]    = {}; //  +02A
-    uint16_t m_pathNodes[16][2] = {}; //  +09C - pathNode is struct of {xPos, yPos}
-                                        // clang-format on
-    };
-
     struct MonsterData
     {
+        using Path = DynamicPath;
         // clang-format off
                                         //  sizeof = 0x60
     uint32_t m_pMonStats     = {};      //  +000 - pMonStats - record in monstats.txt
@@ -247,6 +249,7 @@ namespace Raw
 
     struct PlayerData
     {
+        using Path = DynamicPath;
         // Not well explored/documented
         // clang-format off
     uint8_t m_name[0x10]                = {}; //+00	Player Name
@@ -261,7 +264,7 @@ namespace Raw
     uint8_t m_townPortalId            = {}; //+48	Object UniqueID for TownPortals
     uint8_t m_unknown5[0x53]          = {}; //+49
     uint32_t m_pNetClient             = {}; //+9C	ptClient
-                                  // clang-format on
+                                     // clang-format on
     };
 
     struct NoData
@@ -391,7 +394,7 @@ namespace Raw
     uint32_t m_pPrevUnitInRoom = {}; //  +0E8 - pPrevUnitInRoom - the previous unit in the current room
     uint32_t m_pMsgFirst       = {}; //  +0EC - pMsgFirst
     uint32_t m_pMsgLast        = {}; //  +0F0 - pMsgLast
-                                // clang-format on
+                                   // clang-format on
     };
 
     struct Game
@@ -444,14 +447,292 @@ namespace Raw
     uint32_t m_bUberBaal             = {}; //  +1DE8 - bUberBaal - killed uber baal
     uint32_t m_bUberDiablo           = {}; //  +1DEC - bUberDiablo - killed uber diablo
     uint32_t m_bUberMephisto         = {}; //  +1DF0 - bUberMephisto - killed uber mephisto
-                                     // clang-format on
+                                        // clang-format on
     };
 
 #pragma pack(pop)
 
 }  // namespace Raw
 
-using TestAchiBuilder = GE::AchievementBuilder<std::string>;
+namespace D2Data
+{
+    enum class Difficulty
+    {
+        Normal,
+        Nightmare,
+        Hell
+    };
+
+    enum class GameType
+    {
+        Unknown
+    };
+
+    enum class StatType
+    {
+        // TODO
+    };
+
+    enum class ItemSlot
+    {
+        // TODO
+    };
+
+    struct Stats
+    {
+        Stats(const Raw::StatListEx* raw)
+        {
+            auto& stats = raw->m_baseStats;
+            for (uint32_t i = 0; i < stats.m_count; ++i)
+            {
+                m_stats[static_cast<StatType>(stats.m_pStats->m_statId)] = stats.m_pStats->m_value;
+            }
+            // TODO fix hp and mana values
+        }
+
+        bool Has(StatType aStat) const { return m_stats.contains(aStat); }
+
+        bool GetValue(StatType aStat) const { return m_stats.at(aStat); }
+
+    private:
+        std::map<StatType, int32_t> m_stats;
+    };
+
+    struct Position
+    {
+        const uint16_t x;
+        const uint16_t y;
+    };
+
+    struct Unit
+    {
+        Unit(const Raw::StatListEx* aStatList, uint16_t x, uint16_t y)
+            : m_stats(aStatList)
+            , m_pos({x, y})
+        {
+        }
+
+        const Stats m_stats;
+        const Position m_pos;
+    };
+
+    struct Item : public Unit
+    {
+        Item(const Raw::UnitData<Raw::ItemData>* aRaw)
+            : Unit(aRaw->m_pStatListEx, aRaw->m_pPath->m_xPos, aRaw->m_pPath->m_yPos)
+        {
+        }
+
+        using Raw = Raw::ItemData;
+    };
+
+    struct Player : public Unit
+    {
+        Player(const Raw::UnitData<Raw::PlayerData>* aRaw)
+            : Unit(aRaw->m_pStatListEx, aRaw->m_pPath->m_xPos, aRaw->m_pPath->m_yPos)
+        {
+        }
+
+        using Raw = Raw::PlayerData;
+    };
+
+    struct Monster : public Unit
+    {
+        Monster(const Raw::UnitData<Raw::MonsterData>* aRaw)
+            : Unit(aRaw->m_pStatListEx, aRaw->m_pPath->m_xPos, aRaw->m_pPath->m_yPos)
+        {
+        }
+
+        using Raw = Raw::MonsterData;
+
+        bool IsDead() const { return false; }
+    };
+
+    template <typename UnitType>
+    struct Units
+    {
+        Units(const Raw::UnitData<typename UnitType::Raw>* const aRaw[128])
+        {
+            for (uint32_t i = 0; i < 128; ++i)
+            {
+                IterateThroughUnits(aRaw[i]);
+            }
+        }
+
+        const std::vector<UnitType> GetAll() const { return m_units; }
+
+    protected:
+        void IterateThroughUnits(const Raw::UnitData<typename UnitType::Raw>* aUnit)
+        {
+            if (!aUnit)
+            {
+                return;
+            }
+            m_units.emplace_back(aUnit);
+            IterateThroughUnits(aUnit->m_pPrevUnit);
+        }
+
+        std::vector<UnitType> m_units;
+    };
+
+    struct Players : public Units<Player>
+    {
+        Players(const Raw::UnitData<Raw::PlayerData>* const aRaw[128])
+            : Units(aRaw)
+        {
+        }
+
+        const Player& GetLocal() const
+        {
+            // TODO somehow decide which is local
+            return m_units.front();
+        }
+    };
+
+    struct Monsters : public Units<Monster>
+    {
+        Monsters(const Raw::UnitData<Raw::MonsterData>* const aRaw[128])
+            : Units(aRaw)
+        {
+            for (const auto& mon : m_units)
+            {
+                if (mon.IsDead())
+                {
+                    m_dead.push_back(&mon);
+                }
+                else
+                {
+                    m_alive.push_back(&mon);
+                }
+            }
+        }
+
+        const std::vector<const Monster*>& GetAlive() const { return m_alive; }
+
+        const std::vector<const Monster*>& GetDead() const { return m_dead; }
+
+    private:
+        std::vector<const Monster*> m_alive;
+        std::vector<const Monster*> m_dead;
+    };
+
+    struct Items : public Units<Item>
+    {
+        Items(const Raw::UnitData<Raw::ItemData>* const aRaw[128])
+            : Units(aRaw)
+        {
+            for (const auto& item : m_units)
+            {
+                SortOutItem(item);
+            }
+        }
+
+        const std::vector<const Item*>& GetEquipped() const { return m_equipped; }
+
+        const std::vector<const Item*>& GetDropped() const { return m_dropped; }
+
+        const std::vector<const Item*>& GetInInventory() const { return m_inInventory; }
+
+        const std::vector<const Item*>& GetInCube() const { return m_inCube; }
+
+        const std::vector<const Item*>& GetInStash() const { return m_inStash; }
+
+        const std::optional<const Item*>& GetInHand() const { return m_inHand; }
+
+        const std::optional<const Item*>& GetEquipped(ItemSlot aSlot) const { return {}; }
+
+    private:
+        void SortOutItem(const Item& item)
+        {
+            // TODO
+        }
+
+        std::vector<const Item*> m_equipped;
+        std::vector<const Item*> m_dropped;
+        std::vector<const Item*> m_inInventory;
+        std::vector<const Item*> m_inCube;
+        std::vector<const Item*> m_inStash;
+        std::optional<const Item*> m_inHand;
+    };
+
+    struct DataAccess
+    {
+        DataAccess(std::shared_ptr<GE::DataAccessor> aDataAccess)
+            : m_dataAccess(std::move(aDataAccess))
+            , m_difficulty(static_cast<D2Data::Difficulty>(m_dataAccess->Get<Raw::Game>("Game")->m_difficultyLevel))
+            , m_gameType(D2Data::GameType{})  // TODO
+        {
+            const size_t frames = m_dataAccess->GetNumberOfFrames();
+            for (size_t i = 1; i <= frames; ++i)
+            {
+                m_frames.push_back(std::make_unique<FrameData>(*m_dataAccess, frames - i));
+            }
+        }
+
+        void AdvanceFrame()
+        {
+            std::rotate(m_frames.rbegin(), m_frames.rbegin() + 1, m_frames.rend());
+            m_frames.front() = std::make_unique<FrameData>(*m_dataAccess);
+        }
+
+        // Frame independent
+        D2Data::Difficulty GetDifficulty() const { return m_difficulty; }
+
+        D2Data::GameType GetGameType() const { return m_gameType; }
+
+        // Frame dependent
+
+    private:
+        std::shared_ptr<GE::DataAccessor> m_dataAccess;
+
+        const D2Data::Difficulty m_difficulty;
+        const D2Data::GameType m_gameType;
+
+        struct FrameData
+        {
+            FrameData(const GE::DataAccessor& aDataAccess, size_t aFrame = 0)
+                : m_players(aDataAccess.Get<Raw::Game>("Game", aFrame)->m_pPlayerList)
+                , m_monsters(aDataAccess.Get<Raw::Game>("Game", aFrame)->m_pMonsterList)
+                , m_items(aDataAccess.Get<Raw::Game>("Game", aFrame)->m_pItemList)
+            {
+            }
+
+            Players m_players;
+            Monsters m_monsters;
+            Items m_items;
+        };
+
+        std::vector<std::unique_ptr<FrameData>> m_frames;
+    };
+
+    struct SharedData
+    {
+        SharedData(std::shared_ptr<D2Data::DataAccess> aDataAccess)
+            : m_dataAccess(std::move(aDataAccess))
+        {
+        }
+
+        void Update()
+        {
+            // TODO all the fucking updates
+        }
+
+    private:
+        std::shared_ptr<D2Data::DataAccess> m_dataAccess;
+
+        // Items
+        // dropped
+        // picked
+        // equipped
+        // unequipped
+
+        // Monsters
+        // new
+        // died
+    };
+}
+
+using TestAchiBuilder = GE::AchievementBuilder<std::string, GE::None, D2Data::SharedData, D2Data::DataAccess>;
 using TestAchievement = decltype(std::declval<TestAchiBuilder>().Build());
 
 void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
@@ -470,7 +751,13 @@ void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
     auto playerDataLayout = GE::LayoutBuilder::MakeAbsolute()->SetTotalSize(sizeof(Raw::PlayerData)).Build();
     auto staticPathLayout = GE::LayoutBuilder::MakeAbsolute()->SetTotalSize(sizeof(Raw::StaticPath)).Build();
     auto statlistLayout = GE::LayoutBuilder::MakeAbsolute()->SetTotalSize(sizeof(Raw::StatList)).Build();
-    auto statlistExLayout = GE::LayoutBuilder::MakeAbsolute()->SetTotalSize(sizeof(Raw::StatListEx)).Build();
+    auto statlistExLayout = GE::LayoutBuilder::MakeAbsolute()
+                                ->SetTotalSize(sizeof(Raw::StatListEx))
+                                .AddPointerOffsets<Raw::StatListEx>(0x24,
+                                                                    [](Raw::StatListEx* aStatList) {
+                                                                        return aStatList->m_baseStats.m_count * sizeof(Raw::Stat);
+                                                                    })
+                                .Build();
     auto unitLayout = GE::LayoutBuilder::MakeAbsolute()
                           ->SetTotalSize(sizeof(Raw::UnitData<>))
                           .AddPointerOffsets<Raw::UnitData<>>(0x14,
@@ -597,14 +884,21 @@ TEST_F(GE_Tests, Test)
     });
     memoryProcessor->Initialize();
 
+    std::shared_ptr<D2Data::DataAccess> dataAccess;
+    std::shared_ptr<D2Data::SharedData> sharedData;
+    memoryProcessor->SetOnReadyCallback([&](std::shared_ptr<GE::DataAccessor> aDataAccess) {
+        dataAccess = std::make_shared<D2Data::DataAccess>(aDataAccess);
+        sharedData = std::make_shared<D2Data::SharedData>(dataAccess);
+    });
+
     std::cout << "Creating achievements" << std::endl;
     auto achis = GetAchievements();
 
-    memoryProcessor->SetUpdateCallback(1000, [&achis, &memoryProcessor](const GE::DataAccessor& aDataAccess) {
-        GE::None sharedState;
+    memoryProcessor->SetUpdateCallback(1000, [&](const GE::DataAccessor&) {
+        sharedData->Update();
         for (auto& a : achis)
         {
-            a->Update(aDataAccess, sharedState);
+            a->Update(*dataAccess, *sharedData);
         }
         PrintAchievements(achis);
         if (std::all_of(achis.begin(), achis.end(), [&memoryProcessor](const auto& a) {

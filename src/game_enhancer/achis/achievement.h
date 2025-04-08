@@ -18,12 +18,12 @@ namespace GE
     {
     };
 
-    template <typename Metadata, typename SharedData>
+    template <typename Metadata, typename SharedData, typename DataAccess = GE::DataAccessor>
     struct Achievement
     {
         virtual ~Achievement() = default;
 
-        virtual void Update(const DataAccessor& aDataAccess, const SharedData& aSharedData) = 0;
+        virtual void Update(const DataAccess& aDataAccess, const SharedData& aSharedData) = 0;
         virtual Status GetStatus() const = 0;
 
         /*
@@ -39,20 +39,20 @@ namespace GE
 
     namespace details
     {
-        template <typename Metadata, typename CustomData, typename SharedData>
-        class AchievementImpl : public Achievement<Metadata, SharedData>
+        template <typename Metadata, typename CustomData, typename SharedData, typename DataAccess = GE::DataAccessor>
+        class AchievementImpl : public Achievement<Metadata, SharedData, DataAccess>
         {
             struct NamedConditions
             {
                 std::optional<std::vector<bool>> m_results;
                 std::vector<std::string> m_names;
-                std::function<void(const DataAccessor&, CustomData&, const SharedData&)> m_onPassCallback;
+                std::function<void(const DataAccess&, CustomData&, const SharedData&)> m_onPassCallback;
             };
 
             const size_t m_id = 0;
             Status m_status = Status::Inactive;
             const Metadata m_metadata;
-            Conditions<CustomData&, const SharedData&> m_conditions;
+            Conditions<const DataAccess&, CustomData&, const SharedData&> m_conditions;
             CustomData m_customData;
 
             std::unordered_map<ConditionType, NamedConditions> m_cachedConditions;
@@ -65,7 +65,7 @@ namespace GE
                 }
             }
 
-            void ProcessInactive(const DataAccessor& aDataAccess, const SharedData& aSharedData)
+            void ProcessInactive(const DataAccess& aDataAccess, const SharedData& aSharedData)
             {
                 auto& preconditionsCached = m_cachedConditions[ConditionType::Precondition];
                 preconditionsCached.m_results = m_conditions.Evaluate(ConditionType::Precondition, aDataAccess, m_customData,
@@ -88,7 +88,7 @@ namespace GE
                 }
             }
 
-            void ProcessActive(const DataAccessor& aDataAccess, const SharedData& aSharedData)
+            void ProcessActive(const DataAccess& aDataAccess, const SharedData& aSharedData)
             {
                 auto& completersCached = m_cachedConditions[ConditionType::Completer];
                 auto& invariantsCached = m_cachedConditions[ConditionType::Invariant];
@@ -116,7 +116,7 @@ namespace GE
                 }
             }
 
-            void ProcessFailed(const DataAccessor& aDataAccess, const SharedData& aSharedData)
+            void ProcessFailed(const DataAccess& aDataAccess, const SharedData& aSharedData)
             {
                 auto& resetersCached = m_cachedConditions[ConditionType::Reseter];
                 resetersCached.m_results = m_conditions.Evaluate(ConditionType::Reseter, aDataAccess, m_customData, aSharedData);
@@ -134,10 +134,11 @@ namespace GE
         public:
             AchievementImpl(
                 size_t aId, Metadata aMetadata,
-                std::unordered_map<ConditionType, std::vector<Condition<CustomData&, const SharedData&>>> aConditions,
+                std::unordered_map<ConditionType, std::vector<Condition<const DataAccess&, CustomData&, const SharedData&>>>
+                    aConditions,
                 std::unordered_map<ConditionType, std::vector<std::string>> aNames,
-                std::unordered_map<ConditionType, std::function<void(const DataAccessor&, CustomData&, const SharedData&)>>
-                    aCallbacks = {})
+                std::unordered_map<ConditionType, std::function<void(const DataAccess&, CustomData&, const SharedData&)>>
+                    aOnPassCallbacks = {})
                 : m_id(aId)
                 , m_metadata(std::move(aMetadata))
                 , m_conditions(std::move(aConditions))
@@ -145,14 +146,14 @@ namespace GE
                 for (auto& [cType, cNames] : aNames)
                 {
                     m_cachedConditions[cType].m_names = std::move(cNames);
-                    if (aCallbacks.contains(cType))
+                    if (aOnPassCallbacks.contains(cType))
                     {
-                        m_cachedConditions[cType].m_onPassCallback = aCallbacks[cType];
+                        m_cachedConditions[cType].m_onPassCallback = aOnPassCallbacks[cType];
                     }
                 }
             }
 
-            void Update(const DataAccessor& aDataAccess, const SharedData& aSharedData) override
+            void Update(const DataAccess& aDataAccess, const SharedData& aSharedData) override
             {
                 ResetCaches();
 
@@ -204,16 +205,17 @@ namespace GE
         }
     }
 
-    template <typename Metadata = None, typename CustomData = None, typename SharedData = None>
+    template <typename Metadata = None, typename CustomData = None, typename SharedData = None,
+              typename DataAccess = GE::DataAccessor>
     class AchievementBuilder
     {
         static_assert(std::is_default_constructible_v<CustomData>, "CustomData has to be default constructible");
 
         Metadata m_metadata;
 
-        std::unordered_map<ConditionType, std::vector<Condition<CustomData&, const SharedData&>>> m_conditions;
+        std::unordered_map<ConditionType, std::vector<Condition<const DataAccess&, CustomData&, const SharedData&>>> m_conditions;
         std::unordered_map<ConditionType, std::vector<std::string>> m_names;
-        std::unordered_map<ConditionType, std::function<void(const DataAccessor&, CustomData&, const SharedData&)>>
+        std::unordered_map<ConditionType, std::function<void(const DataAccess&, CustomData&, const SharedData&)>>
             m_onPassCallbacks;
 
     public:
@@ -222,15 +224,15 @@ namespace GE
         {
         }
 
-        std::unique_ptr<Achievement<Metadata, SharedData>> Build()
+        std::unique_ptr<Achievement<Metadata, SharedData, DataAccess>> Build()
         {
-            return std::make_unique<details::AchievementImpl<Metadata, CustomData, SharedData>>(
+            return std::make_unique<details::AchievementImpl<Metadata, CustomData, SharedData, DataAccess>>(
                 details::GetNextId(), std::move(m_metadata), std::move(m_conditions), std::move(m_names),
                 std::move(m_onPassCallbacks));
         }
 
         AchievementBuilder& Add(ConditionType aConditionType, std::string aDescription,
-                                const typename Condition<CustomData&, const SharedData&>::Callable& aCallable,
+                                const typename Condition<const DataAccess&, CustomData&, const SharedData&>::Callable& aCallable,
                                 bool aOneTimeSuffice = false)
         {
             m_names[aConditionType].emplace_back(std::move(aDescription));
@@ -246,7 +248,7 @@ namespace GE
          * Reseter callback: when Failed -> Inactive
          */
         AchievementBuilder& OnPass(ConditionType aConditionType,
-                                   const std::function<void(const DataAccessor&, CustomData&, const SharedData&)>& aCallback)
+                                   const std::function<void(const DataAccess&, CustomData&, const SharedData&)>& aCallback)
         {
             if (aConditionType == ConditionType::Precondition || aConditionType == ConditionType::Invariant)
             {
