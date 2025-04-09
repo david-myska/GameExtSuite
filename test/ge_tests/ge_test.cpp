@@ -1,5 +1,6 @@
 #include "ge_test.h"
 
+#include <set>
 #include <utility>
 
 #include "game_enhancer/achis/achievement.h"
@@ -495,7 +496,7 @@ namespace D2Data
         bool GetValue(StatType aStat) const { return m_stats.at(aStat); }
 
     private:
-        std::map<StatType, int32_t> m_stats;
+        std::unordered_map<StatType, int32_t> m_stats;
     };
 
     struct Position
@@ -552,27 +553,35 @@ namespace D2Data
     struct Units
     {
         Units(const Raw::UnitData<typename UnitType::Raw>* const aRaw[128])
+            : m_units(InitializeUnits(aRaw))
         {
-            for (uint32_t i = 0; i < 128; ++i)
-            {
-                IterateThroughUnits(aRaw[i]);
-            }
         }
 
-        const std::vector<UnitType> GetAll() const { return m_units; }
+        const std::set<const std::unique_ptr<UnitType>>& GetAll() const { return m_units; }
 
     protected:
-        void IterateThroughUnits(const Raw::UnitData<typename UnitType::Raw>* aUnit)
+        static auto InitializeUnits(const Raw::UnitData<typename UnitType::Raw>* const aRaw[128])
+        {
+            std::set<std::unique_ptr<UnitType>> result;
+            for (uint32_t i = 0; i < 128; ++i)
+            {
+                IterateThroughUnits(aRaw[i], result);
+            }
+            return result;
+        }
+
+        static void IterateThroughUnits(const Raw::UnitData<typename UnitType::Raw>* aUnit,
+                                        std::set<std::unique_ptr<UnitType>>& aOutput)
         {
             if (!aUnit)
             {
                 return;
             }
-            m_units.emplace_back(aUnit);
-            IterateThroughUnits(aUnit->m_pPrevUnit);
+            aOutput.insert(std::make_unique<UnitType>(aUnit));
+            IterateThroughUnits(aUnit->m_pPrevUnit, aOutput);
         }
 
-        std::vector<UnitType> m_units;
+        const std::set<std::unique_ptr<UnitType>> m_units;
     };
 
     struct Players : public Units<Player>
@@ -585,7 +594,7 @@ namespace D2Data
         const Player& GetLocal() const
         {
             // TODO somehow decide which is local
-            return m_units.front();
+            return **m_units.begin();
         }
     };
 
@@ -596,24 +605,24 @@ namespace D2Data
         {
             for (const auto& mon : m_units)
             {
-                if (mon.IsDead())
+                if (mon->IsDead())
                 {
-                    m_dead.push_back(&mon);
+                    m_dead.insert(mon.get());
                 }
                 else
                 {
-                    m_alive.push_back(&mon);
+                    m_alive.insert(mon.get());
                 }
             }
         }
 
-        const std::vector<const Monster*>& GetAlive() const { return m_alive; }
+        const std::set<const Monster*>& GetAlive() const { return m_alive; }
 
-        const std::vector<const Monster*>& GetDead() const { return m_dead; }
+        const std::set<const Monster*>& GetDead() const { return m_dead; }
 
     private:
-        std::vector<const Monster*> m_alive;
-        std::vector<const Monster*> m_dead;
+        std::set<const Monster*> m_alive;
+        std::set<const Monster*> m_dead;
     };
 
     struct Items : public Units<Item>
@@ -623,37 +632,79 @@ namespace D2Data
         {
             for (const auto& item : m_units)
             {
-                SortOutItem(item);
+                SortOutItem(item.get());
             }
         }
 
-        const std::vector<const Item*>& GetEquipped() const { return m_equipped; }
+        const std::set<const Item*>& GetEquipped() const { return m_equipped; }
 
-        const std::vector<const Item*>& GetDropped() const { return m_dropped; }
+        const std::set<const Item*>& GetDropped() const { return m_dropped; }
 
-        const std::vector<const Item*>& GetInInventory() const { return m_inInventory; }
+        const std::set<const Item*>& GetInInventory() const { return m_inInventory; }
 
-        const std::vector<const Item*>& GetInCube() const { return m_inCube; }
+        const std::set<const Item*>& GetInCube() const { return m_inCube; }
 
-        const std::vector<const Item*>& GetInStash() const { return m_inStash; }
+        const std::set<const Item*>& GetInStash() const { return m_inStash; }
 
-        const std::optional<const Item*>& GetInHand() const { return m_inHand; }
+        std::optional<const Item*> GetInHand() const { return m_inHand; }
 
-        const std::optional<const Item*>& GetEquipped(ItemSlot aSlot) const { return {}; }
+        std::optional<const Item*> GetEquipped(ItemSlot aSlot) const { return {}; }
 
     private:
-        void SortOutItem(const Item& item)
+        void SortOutItem(const Item* item)
         {
             // TODO
         }
 
-        std::vector<const Item*> m_equipped;
-        std::vector<const Item*> m_dropped;
-        std::vector<const Item*> m_inInventory;
-        std::vector<const Item*> m_inCube;
-        std::vector<const Item*> m_inStash;
+        std::set<const Item*> m_equipped;
+        std::set<const Item*> m_dropped;
+        std::set<const Item*> m_inInventory;
+        std::set<const Item*> m_inCube;
+        std::set<const Item*> m_inStash;
         std::optional<const Item*> m_inHand;
     };
+
+    template <typename T>
+    std::set<T> Union(const std::set<T>& l, const std::set<T>& r)
+    {
+        std::set<T> result;
+        std::set_union(l.begin(), l.end(), r.begin(), r.end(), std::inserter(result, result.begin()));
+        return result;
+    }
+
+    template <typename T>
+    std::set<T> operator+(const std::set<T>& l, const std::set<T>& r)
+    {
+        return Union(l, r);
+    }
+
+    template <typename T>
+    std::set<T> Intersection(const std::set<T>& l, const std::set<T>& r)
+    {
+        std::set<T> result;
+        std::set_intersection(l.begin(), l.end(), r.begin(), r.end(), std::inserter(result, result.begin()));
+        return result;
+    }
+
+    template <typename T>
+    std::set<T> operator^(const std::set<T>& l, const std::set<T>& r)
+    {
+        return Intersection(l, r);
+    }
+
+    template <typename T>
+    std::set<T> Difference(const std::set<T>& l, const std::set<T>& r)
+    {
+        std::set<T> result;
+        std::set_difference(l.begin(), l.end(), r.begin(), r.end(), std::inserter(result, result.begin()));
+        return result;
+    }
+
+    template <typename T>
+    std::set<T> operator-(const std::set<T>& l, const std::set<T>& r)
+    {
+        return Difference(l, r);
+    }
 
     struct DataAccess
     {
@@ -710,9 +761,10 @@ namespace D2Data
         SharedData(std::shared_ptr<D2Data::DataAccess> aDataAccess)
             : m_dataAccess(std::move(aDataAccess))
         {
+            Update();
         }
 
-        void Update()
+        void Update() noexcept
         {
             // TODO all the fucking updates
         }
@@ -721,14 +773,16 @@ namespace D2Data
         std::shared_ptr<D2Data::DataAccess> m_dataAccess;
 
         // Items
-        // dropped
-        // picked
-        // equipped
-        // unequipped
+        std::set<Item*> m_droppedItems;
+        std::set<Item*> m_pickedItems;
+        std::set<Item*> m_equippedItems;
+        std::set<Item*> m_unequippedItems;
 
         // Monsters
-        // new
-        // died
+        std::set<Monster*> m_newMonsters;
+        std::set<Monster*> m_deadMonsters;
+        std::set<Monster*> m_outMonsters;
+        std::set<Monster*> m_inMonsters;
     };
 }
 
