@@ -14,9 +14,34 @@
 
 namespace GE
 {
+    struct MainLayout
+    {
+        MainLayoutCallbacks m_callbacks;
+        bool m_active = false;
+        size_t m_index = 0;
+        size_t m_consecutiveFrames = 0;
+        std::optional<PMA::MemoryAddress> m_dataFromEnabler;
+    };
+
     class MemoryProcessorImpl : public MemoryProcessor
     {
-        std::unordered_map<LayoutId, MainLayoutCallbacks> m_mainLayouts;
+        class EnablerImpl : public Enabler
+        {
+            MemoryProcessorImpl& m_memProc;
+            const size_t m_index;
+
+            void EnsureSubsequent(const LayoutId& aLayout);
+
+        public:
+            EnablerImpl(MemoryProcessorImpl& aMemProc, size_t aIndex);
+
+            void Enable(const LayoutId& aLayout, const std::optional<PMA::MemoryAddress>& aData = {}) override;
+
+            void Disable(const LayoutId& aLayout) override;
+        };
+
+        std::vector<LayoutId> m_mainLayoutOrder;
+        std::unordered_map<LayoutId, MainLayout> m_mainLayouts;
         std::unordered_map<LayoutId, LayoutBuilder::Absolute::Layout> m_layouts;
 
         PMA::TargetProcessPtr m_targetProcess;
@@ -33,8 +58,8 @@ namespace GE
         std::atomic<bool> m_running = false;
 
         std::shared_ptr<DataAccessor> m_dataAccessor;
-        std::function<void(std::shared_ptr<DataAccessor>)> m_onReadyCallback;
 
+        void ReadMainLayouts();
         void Update();
         uint8_t* ReadData(size_t aBytes, size_t aFromAddress, FrameMemoryStorage& aCurrentFrameStorage);
         uint8_t* ReadLayout(const std::string& aLayoutType, size_t aFromAddress,

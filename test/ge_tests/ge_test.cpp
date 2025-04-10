@@ -155,24 +155,25 @@ TEST_F(GE_Tests, Test)
 
     RegisterLayouts(*memoryProcessor);
 
-    memoryProcessor->AddStarterLayout("Game", [](PMA::MemoryAccessPtr aMemoryAccess) {
+    std::shared_ptr<Data::DataAccess> dataAccess;
+    std::shared_ptr<Data::SharedData> sharedData;
+
+    GE::MainLayoutCallbacks mainLayoutCallbacks;
+    mainLayoutCallbacks.m_baseLocator = [](PMA::MemoryAccessPtr aMemoryAccess, const std::optional<PMA::MemoryAddress>&) {
         size_t address = 0;
         EXPECT_NO_THROW(aMemoryAccess->Read("D2Client.dll", 0x12236C, reinterpret_cast<uint8_t*>(&address), sizeof(size_t)));
         return address;
-    });
-    memoryProcessor->Initialize();
-
-    std::shared_ptr<Data::DataAccess> dataAccess;
-    std::shared_ptr<Data::SharedData> sharedData;
-    memoryProcessor->SetOnReadyCallback([&](std::shared_ptr<GE::DataAccessor> aDataAccess) {
+    };
+    mainLayoutCallbacks.m_onReady = [&](std::shared_ptr<GE::DataAccessor> aDataAccess) {
         dataAccess = std::make_shared<Data::DataAccess>(aDataAccess);
         sharedData = std::make_shared<Data::SharedData>(dataAccess);
-    });
+    };
+    memoryProcessor->AddMainLayout("Game", mainLayoutCallbacks);
 
     std::cout << "Creating achievements" << std::endl;
     auto achis = GetAchievements();
 
-    memoryProcessor->SetUpdateCallback(1000, [&](const GE::DataAccessor&) {
+    memoryProcessor->SetUpdateCallback([&](const GE::DataAccessor&) {
         dataAccess->AdvanceFrame();
         sharedData->Update();
         for (auto& a : achis)
@@ -189,13 +190,6 @@ TEST_F(GE_Tests, Test)
         }
     });
 
-    // TODO need to have some condition on what layout should be read when
-    // probably:
-    // - store number of frames per layout
-    // - have a way to activate/disable layouts that should be read
-    // - for this each layout should have some decider function
-    // - sometimes it might be good to have a layout that is read always to see if we are in menu or in game
-    // - then there should be UpdateCallbacks for each layout -> and merging.. pass vector of layouts sharing a callback
     std::cout << "Starting memoryProcessor" << std::endl;
     memoryProcessor->Start();
     memoryProcessor->Wait();

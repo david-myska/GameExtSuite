@@ -12,30 +12,93 @@
 
 namespace GE
 {
-    void MemoryProcessorImpl::Update()
+    void MemoryProcessorImpl::EnablerImpl::EnsureSubsequent(const LayoutId& aLayout)
+    {
+        auto& order = m_memProc.m_mainLayoutOrder;
+        auto it = std::find(order.begin(), order.end(), aLayout);
+        if (it == order.end())
+        {
+            throw std::runtime_error(std::format("Layout '{}' not registered as MainLayout", aLayout));
+        }
+        size_t index = std::distance(order.begin(), it);
+        if (index <= m_index)
+        {
+            throw std::runtime_error(std::format("Cannot enable layout '{}' before current layout", aLayout));
+        }
+    }
+
+    MemoryProcessorImpl::EnablerImpl::EnablerImpl(MemoryProcessorImpl& aMemProc, size_t aIndex)
+        : m_memProc(aMemProc)
+        , m_index(aIndex)
+    {
+    }
+
+    void MemoryProcessorImpl::EnablerImpl::Enable(const LayoutId& aLayout, const std::optional<PMA::MemoryAddress>& aData)
+    {
+        EnsureSubsequent(aLayout);
+        m_memProc.m_mainLayouts[aLayout].m_active = true;
+        m_memProc.m_mainLayouts[aLayout].m_dataFromEnabler = aData;
+    }
+
+    void MemoryProcessorImpl::EnablerImpl::Disable(const LayoutId& aLayout)
+    {
+        EnsureSubsequent(aLayout);
+        auto& l = m_memProc.m_mainLayouts[aLayout];
+        if (l.m_active)
+        {
+            if (l.m_callbacks.m_onDisabled)
+            {
+                (*l.m_callbacks.m_onDisabled)(*m_memProc.m_dataAccessor);
+                l.m_consecutiveFrames = 0;
+            }
+        }
+        l.m_active = false;
+    }
+
+    void MemoryProcessorImpl::ReadMainLayouts()
     {
         FrameMemoryStorage currentFrameStorage;
         std::unordered_map<size_t, uint8_t*> pointerMap;
-        for (const auto& layout : m_starterLayouts)
+        for (int i = 0; i < m_mainLayoutOrder.size(); ++i)
         {
-            currentFrameStorage.SetLayoutBase(
-                layout.first, ReadLayout(layout.first, layout.second(m_memoryAccess), pointerMap, currentFrameStorage));
-        }
+            const auto& layoutId = m_mainLayoutOrder[i];
+            auto& layout = m_mainLayouts[layoutId];
+            if (!layout.m_active)
+            {
+                continue;
+            }
 
+            auto baseAddress = layout.m_callbacks.m_baseLocator(m_memoryAccess, layout.m_dataFromEnabler);
+            currentFrameStorage.SetLayoutBase(layoutId, ReadLayout(layoutId, baseAddress, pointerMap, currentFrameStorage));
+            layout.m_consecutiveFrames++;
+
+            if (layout.m_callbacks.m_enabler)
+            {
+                EnablerImpl enabler(*this, i);
+                (*layout.m_callbacks.m_enabler)(*m_dataAccessor, enabler);
+            }
+        }
         m_storedFrames->push_back(std::move(currentFrameStorage));
         if (m_storedFrames->size() > m_framesToKeep)
         {
             m_storedFrames->pop_front();
         }
+    }
+
+    void MemoryProcessorImpl::Update()
+    {
         if (m_storedFrames->size() < m_framesToKeep)
         {
             return;
         }
 
-        if (!m_dataAccessor)
+        for (size_t i = 0; i < m_mainLayoutOrder.size(); ++i)
         {
-            m_dataAccessor = std::make_shared<DataAccessorImpl>(m_storedFrames);
-            m_onReadyCallback(m_dataAccessor);
+            auto& layout = m_mainLayouts[m_mainLayoutOrder[i]];
+            if (layout.m_active && layout.m_callbacks.m_onReady && layout.m_consecutiveFrames == m_framesToKeep)
+            {
+                (*layout.m_callbacks.m_onReady)(m_dataAccessor);
+            }
         }
 
         try
@@ -108,7 +171,12 @@ namespace GE
     void MemoryProcessorImpl::AddMainLayout(const LayoutId& aLayoutId, const MainLayoutCallbacks& aCallbacks)
     {
         EnsureNotRunning();
-        m_mainLayouts[aLayoutId] = aCallbacks;
+        if (m_mainLayouts.contains(aLayoutId))
+        {
+            throw std::runtime_error(std::format("Layout '{}' already defined as MainLayout", aLayoutId));
+        }
+        m_mainLayoutOrder.push_back(aLayoutId);
+        m_mainLayouts[aLayoutId] = {aCallbacks, m_mainLayouts.empty()};
     }
 
     void MemoryProcessorImpl::SetUpdateCallback(const std::function<void(const DataAccessor&)>& aCallback, size_t aFramesToKeep,
@@ -134,7 +202,8 @@ namespace GE
         }
     }
 
-    void MemoryProcessorImpl::ResetStoredData() {
+    void MemoryProcessorImpl::ResetStoredData()
+    {
         m_dataAccessor.reset();
         m_storedFrames->clear();
     }
@@ -150,11 +219,13 @@ namespace GE
             m_memoryAccess = m_targetProcess->GetMemoryAccess();
             m_updateThread = std::jthread([this](std::stop_token aStopToken) {
                 m_running = true;
+                m_dataAccessor = std::make_shared<DataAccessorImpl>(m_storedFrames);
                 while (!aStopToken.stop_requested())
                 {
                     auto frameStartTime = std::chrono::steady_clock::now();
                     try
                     {
+                        ReadMainLayouts();
                         Update();
                     }
                     catch (const std::exception& e)

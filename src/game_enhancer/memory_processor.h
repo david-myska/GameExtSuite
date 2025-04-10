@@ -15,18 +15,20 @@ namespace GE
     struct MemoryProcessor;
     using MemoryProcessorPtr = std::unique_ptr<MemoryProcessor>;
 
+    using LayoutId = std::string;
+
     struct Enabler
     {
+        virtual void Enable(const LayoutId& aLayout, const std::optional<PMA::MemoryAddress>& aData = {}) = 0;
+        virtual void Disable(const LayoutId& aLayout) = 0;
     };
-
-    using LayoutId = std::string;
 
     struct MainLayoutCallbacks
     {
-        std::function<PMA::MemoryAddress(PMA::MemoryAccessPtr)> m_baseLocator;
+        std::function<PMA::MemoryAddress(PMA::MemoryAccessPtr, const std::optional<PMA::MemoryAddress>&)> m_baseLocator;
         std::optional<std::function<void(const DataAccessor&, Enabler&)>> m_enabler;
+        std::optional<std::function<void(const DataAccessor&)>> m_onDisabled;
         std::optional<std::function<void(std::shared_ptr<DataAccessor>)>> m_onReady;
-        std::optional<std::function<void(std::shared_ptr<DataAccessor>)>> m_onDisabled;
     };
 
     /*
