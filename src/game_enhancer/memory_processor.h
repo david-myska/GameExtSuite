@@ -15,6 +15,20 @@ namespace GE
     struct MemoryProcessor;
     using MemoryProcessorPtr = std::unique_ptr<MemoryProcessor>;
 
+    struct Enabler
+    {
+    };
+
+    using LayoutId = std::string;
+
+    struct MainLayoutCallbacks
+    {
+        std::function<PMA::MemoryAddress(PMA::MemoryAccessPtr)> m_baseLocator;
+        std::optional<std::function<void(const DataAccessor&, Enabler&)>> m_enabler;
+        std::optional<std::function<void(std::shared_ptr<DataAccessor>)>> m_onReady;
+        std::optional<std::function<void(std::shared_ptr<DataAccessor>)>> m_onDisabled;
+    };
+
     /*
      * Every pointer, whose type has been registered as a layout, is automatically resolved.
      */
@@ -23,47 +37,55 @@ namespace GE
         static [[nodiscard]] MemoryProcessorPtr Create(PMA::TargetProcessPtr aTargetProcess);
 
         /*
-         * Registers possible starter layouts and layouts that pointers can point at
+         * Registers layouts into the framework. Registered layouts can be used by other layouts and framework understands how to
+         * read them.
          */
-        virtual void RegisterLayout(const std::string& aType, LayoutBuilder::Absolute::Layout aLayout) = 0;
-        // virtual void RegisterLayout(const std::string& aType, LayoutBuilder::Relative::Layout aLayout) = 0;
+        virtual void RegisterLayout(const LayoutId& aId, LayoutBuilder::Absolute::Layout aLayout) = 0;
+        // virtual void RegisterLayout(const std::string& aId, LayoutBuilder::Relative::Layout aLayout) = 0;
 
         /*
-         * Update callback is called for the first time after the first 'FramesToKeep' frames were read.
+         * Sets aLayoutId as a MainLayout.
+         * Main layouts are the starting point for each memory read. They are processed sequentially in the order of addition.
+         * First MainLayout cannot be disabled and is always read.
+         * Full cycle:
+         * - For each MainLayout:
+         *     - Check if the Mainlayout is Enabled (if not, stop processing this layout)
+         *     - Run the BaseLocatorCallback to find the starting MemoryAddress
+         *     - Read TargetProcess' memory according to this layout
+         *     - Run the EnablerCallback to Enable/Disable subsequent MainLayouts
+         * - For each MainLayout:
+         *     - Check if enough frames stored
+         *         - Yes: Once run the OnReadyCallback
+         * - Run UpdateCallback
+         *
+         * aLayoutId - Previously registered layout
+         * aAnchorCallback - Should return address of where the layout starts
+         * aEnablerCallback -
+         * TODO EnablerCallback could optionally pass some value to the aAnchorCallback of other layouts,
+         * ie when decide menu vs game, could pass the address if it is saved already in this layout to avoid repeated reads
+                                        -> const std::function<size_t(PMA::MemoryAccessPtr, std::optional<PMA::MemoryAddress>)>&
+         aAnchorCallback, Enabler class should on activate take optional value that will be passed
+         */
+        virtual void AddMainLayout(const LayoutId& aLayoutId, const MainLayoutCallbacks& aCallbacks) = 0;
+
+        /*
+         * Update callback is called for the first time after the first 'aFramesToKeep' frames were read.
          * After that, it is called every 'aRateMs' milliseconds.
-         * Calculation from FrameRate to UpdateRate: 1000 / FrameRate
+         * aCallback - Main processing callback called once per read frame
+         * aFramesToKeep - Set how many frames to keep in memory. Default: 2
+         * aRateMs - Sets how often the Update callback will be called. Default: 1000 / aFramesToKeep
          */
-        virtual void SetUpdateCallback(size_t aRateMs, const std::function<void(const DataAccessor&)>& aCallback) = 0;
-
-        /*
-         * Adds a starting layout that will be used to resolve pointers and read their layouts
-         * Specifying refresh rate for a layout will cause it to be completely separated from the main loop.
-         *   - Useful for data that doesn't need to be read as ofter as the main loop and doesn't have complex pointer structures
-         *   - Improper use can cause significant performance issues
-         */
-        virtual void AddStarterLayout(const std::string& aType,
-                                      const std::function<size_t(PMA::MemoryAccessPtr aMemoryAccess)>& aCallback) = 0;
-
-        /*
-         * Set how many frames to keep in memory.
-         * This decides how far back in time the data can be accessed during each refresh.
-         */
-        virtual void SetFramesToKeep(size_t aFrames) = 0;
-
-        /*
-         * Prepares the MemoryProcessor for the main loop.
-         * Prepares required memory, might do some optimizations, etc.
-         */
-        virtual void Initialize() = 0;
+        virtual void SetUpdateCallback(const std::function<void(const DataAccessor&)>& aCallback, size_t aFramesToKeep = 2,
+                                       std::optional<size_t> aRateMs = {}) = 0;
 
         /*
          * OnReady callback is called after MemoryProcessor successfully started main loop and first 'FramesToKeep' frames were
          * read. In this callback, setup the SharedState and any helper classes that require DataAccessor to be fully initialized.
          */
-        virtual void SetOnReadyCallback(const std::function<void(std::shared_ptr<DataAccessor>)>& aCallback) = 0;
+        // virtual void SetOnReadyCallback(const std::function<void(std::shared_ptr<DataAccessor>)>& aCallback) = 0;
 
         /*
-         * Starts the main loop. OnRefresh callbacks will be called at the specified refresh rate.
+         * Starts the main loop. Update callbacks will be called at the specified refresh rate.
          */
         virtual void Start() = 0;
 

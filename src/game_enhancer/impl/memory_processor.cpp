@@ -105,23 +105,25 @@ namespace GE
         Stop();
     }
 
-    void MemoryProcessorImpl::RegisterLayout(const std::string& aLayoutType, LayoutBuilder::Absolute::Layout aLayout)
+    void MemoryProcessorImpl::AddMainLayout(const LayoutId& aLayoutId, const MainLayoutCallbacks& aCallbacks)
+    {
+        EnsureNotRunning();
+        m_mainLayouts[aLayoutId] = aCallbacks;
+    }
+
+    void MemoryProcessorImpl::SetUpdateCallback(const std::function<void(const DataAccessor&)>& aCallback, size_t aFramesToKeep,
+                                                std::optional<size_t> aRateMs)
+    {
+        EnsureNotRunning();
+        m_updateCallback = aCallback;
+        m_framesToKeep = aFramesToKeep;
+        m_refreshRateMs = aRateMs.value_or(1000 / aFramesToKeep);
+    }
+
+    void MemoryProcessorImpl::RegisterLayout(const LayoutId& aLayoutType, LayoutBuilder::Absolute::Layout aLayout)
     {
         EnsureNotRunning();
         m_layouts[aLayoutType] = std::move(aLayout);
-    }
-
-    void MemoryProcessorImpl::SetUpdateCallback(size_t aRateMs, const std::function<void(const DataAccessor&)>& aCallback)
-    {
-        EnsureNotRunning();
-        m_refreshRateMs = aRateMs;
-        m_updateCallback = aCallback;
-    }
-
-    void MemoryProcessorImpl::SetOnReadyCallback(const std::function<void(std::shared_ptr<DataAccessor>)>& aCallback)
-    {
-        EnsureNotRunning();
-        m_onReadyCallback = aCallback;
     }
 
     void MemoryProcessorImpl::EnsureNotRunning() const
@@ -205,25 +207,6 @@ namespace GE
         {
             m_updateThread.join();
         }
-    }
-
-    void MemoryProcessorImpl::AddStarterLayout(const std::string& aType,
-                                               const std::function<size_t(PMA::MemoryAccessPtr aMemoryAccess)>& aCallback)
-    {
-        EnsureNotRunning();
-        m_starterLayouts[aType] = aCallback;
-    }
-
-    void MemoryProcessorImpl::SetFramesToKeep(size_t aFrames)
-    {
-        EnsureNotRunning();
-        m_framesToKeep = aFrames;
-    }
-
-    void MemoryProcessorImpl::Initialize()
-    {
-        EnsureNotRunning();
-        // TODO
     }
 
     MemoryProcessorPtr MemoryProcessor::Create(PMA::TargetProcessPtr aTargetProcess)

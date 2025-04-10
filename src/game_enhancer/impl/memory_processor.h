@@ -1,11 +1,11 @@
 #pragma once
 
 #include <atomic>
+#include <deque>
 #include <memory>
 #include <string>
 #include <thread>
 #include <unordered_map>
-#include <deque>
 
 #include "game_enhancer/impl/layout/frame_memory_storage.h"
 #include "game_enhancer/memory_processor.h"
@@ -16,8 +16,8 @@ namespace GE
 {
     class MemoryProcessorImpl : public MemoryProcessor
     {
-        std::unordered_map<std::string, std::function<size_t(PMA::MemoryAccessPtr aMemoryAccess)>> m_starterLayouts;
-        std::unordered_map<std::string, LayoutBuilder::Absolute::Layout> m_layouts;
+        std::unordered_map<LayoutId, MainLayoutCallbacks> m_mainLayouts;
+        std::unordered_map<LayoutId, LayoutBuilder::Absolute::Layout> m_layouts;
 
         PMA::TargetProcessPtr m_targetProcess;
         PMA::AutoAttachPtr m_autoAttach;
@@ -47,18 +47,14 @@ namespace GE
         MemoryProcessorImpl(PMA::TargetProcessPtr aTargetProcess);
         ~MemoryProcessorImpl();
 
-        void RegisterLayout(const std::string& aLayoutType, LayoutBuilder::Absolute::Layout aLayout) override;
-        void SetUpdateCallback(size_t aRateMs, const std::function<void(const DataAccessor&)>& aCallback) override;
-        void SetOnReadyCallback(const std::function<void(std::shared_ptr<DataAccessor>)>& aCallback) override;
+        void RegisterLayout(const LayoutId& aLayoutId, LayoutBuilder::Absolute::Layout aLayout) override;
+        void AddMainLayout(const LayoutId& aLayoutId, const MainLayoutCallbacks& aCallbacks) override;
+        void SetUpdateCallback(const std::function<void(const DataAccessor&)>& aCallback, size_t aFramesToKeep = 2,
+                               std::optional<size_t> aRateMs = {}) override;
         void Start() override;
         void Stop() override;
         void RequestStop() override;
         void Wait() override;
-
-        void AddStarterLayout(const std::string& aType,
-                              const std::function<size_t(PMA::MemoryAccessPtr aMemoryAccess)>& aCallback) override;
-        void SetFramesToKeep(size_t aFrames) override;
-        void Initialize() override;
     };
 
 }
