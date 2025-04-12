@@ -42,7 +42,7 @@ namespace GE
 
         std::vector<LayoutId> m_mainLayoutOrder;
         std::unordered_map<LayoutId, MainLayout> m_mainLayouts;
-        std::unordered_map<LayoutId, LayoutBuilder::Absolute::Layout> m_layouts;
+        std::unordered_map<LayoutId, std::unique_ptr<Layout>> m_layouts;
 
         PMA::TargetProcessPtr m_targetProcess;
         PMA::AutoAttachPtr m_autoAttach;
@@ -61,8 +61,9 @@ namespace GE
 
         void ReadMainLayouts();
         void Update();
+        uint8_t* Allocate(size_t aBytes, size_t aFromAddress, FrameMemoryStorage& aCurrentFrameStorage);
         uint8_t* ReadData(size_t aBytes, size_t aFromAddress, FrameMemoryStorage& aCurrentFrameStorage);
-        uint8_t* ReadLayout(const std::string& aLayoutType, size_t aFromAddress,
+        uint8_t* ReadLayout(const LayoutId& aLayoutId, size_t aFromAddress,
                             std::unordered_map<size_t, uint8_t*>& aPointerMap, FrameMemoryStorage& aCurrentFrameStorage);
         void EnsureNotRunning() const;
 
@@ -72,7 +73,7 @@ namespace GE
         MemoryProcessorImpl(PMA::TargetProcessPtr aTargetProcess);
         ~MemoryProcessorImpl();
 
-        void RegisterLayout(const LayoutId& aLayoutId, LayoutBuilder::Absolute::Layout aLayout) override;
+        void RegisterLayout(const LayoutId& aLayoutId, std::unique_ptr<Layout> aLayout) override;
         void AddMainLayout(const LayoutId& aLayoutId, const MainLayoutCallbacks& aCallbacks) override;
         void SetUpdateCallback(const std::function<void(const DataAccessor&)>& aCallback, size_t aFramesToKeep = 2,
                                std::optional<size_t> aRateMs = {}) override;

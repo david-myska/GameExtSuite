@@ -42,8 +42,7 @@ namespace GE
          * Registers layouts into the framework. Registered layouts can be used by other layouts and framework understands how to
          * read them.
          */
-        virtual void RegisterLayout(const LayoutId& aId, LayoutBuilder::Absolute::Layout aLayout) = 0;
-        // virtual void RegisterLayout(const std::string& aId, LayoutBuilder::Relative::Layout aLayout) = 0;
+        virtual void RegisterLayout(const LayoutId& aId, std::unique_ptr<Layout> aLayout) = 0;
 
         /*
          * Sets aLayoutId as a MainLayout.

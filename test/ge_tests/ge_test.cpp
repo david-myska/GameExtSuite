@@ -15,30 +15,31 @@ using TestAchievement = decltype(std::declval<TestAchiBuilder>().Build());
 
 void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
 {
-    auto dynPathLayout = GE::LayoutBuilder::MakeAbsolute()->SetTotalSize(sizeof(Raw::DynamicPath)).Build();
-    auto gameLayout = GE::LayoutBuilder::MakeAbsolute()
+    auto baseLayout = GE::Layout::MakeConsecutive()->SetTotalSize(sizeof(uint16_t)).Build();
+    auto dynPathLayout = GE::Layout::MakeConsecutive()->SetTotalSize(sizeof(Raw::DynamicPath)).Build();
+    auto gameLayout = GE::Layout::MakeConsecutive()
                           ->SetTotalSize(sizeof(Raw::Game))
-                          .AddPointerOffsets(0x1120, "UnitData", 128)
-                          .AddPointerOffsets(0x1120 + 1 * 128 * 4, "UnitData", 128)
-                          .AddPointerOffsets(0x1120 + 3 * 128 * 4, "UnitData", 128)
+                          .AddPointerOffsets(0x1120u, "UnitData", 128)
+                          .AddPointerOffsets(0x1120u + 1 * 128 * 4, "UnitData", 128)
+                          .AddPointerOffsets(0x1120u + 3 * 128 * 4, "UnitData", 128)
                           .Build();
-    auto inventoryLayout = GE::LayoutBuilder::MakeAbsolute()->SetTotalSize(sizeof(Raw::Inventory)).Build();
-    auto itemLayout = GE::LayoutBuilder::MakeAbsolute()->SetTotalSize(sizeof(Raw::ItemData)).Build();
+    auto inventoryLayout = GE::Layout::MakeConsecutive()->SetTotalSize(sizeof(Raw::Inventory)).Build();
+    auto itemLayout = GE::Layout::MakeConsecutive()->SetTotalSize(sizeof(Raw::ItemData)).Build();
     auto monsterLayout =
-        GE::LayoutBuilder::MakeAbsolute()->SetTotalSize(sizeof(Raw::MonsterData)).AddPointerOffsets(0x2C, 300).Build();
-    auto playerDataLayout = GE::LayoutBuilder::MakeAbsolute()->SetTotalSize(sizeof(Raw::PlayerData)).Build();
-    auto staticPathLayout = GE::LayoutBuilder::MakeAbsolute()->SetTotalSize(sizeof(Raw::StaticPath)).Build();
-    auto statlistLayout = GE::LayoutBuilder::MakeAbsolute()->SetTotalSize(sizeof(Raw::StatList)).Build();
-    auto statlistExLayout = GE::LayoutBuilder::MakeAbsolute()
+        GE::Layout::MakeConsecutive()->SetTotalSize(sizeof(Raw::MonsterData)).AddPointerOffsets(0x2Cu, 300).Build();
+    auto playerDataLayout = GE::Layout::MakeConsecutive()->SetTotalSize(sizeof(Raw::PlayerData)).Build();
+    auto staticPathLayout = GE::Layout::MakeConsecutive()->SetTotalSize(sizeof(Raw::StaticPath)).Build();
+    auto statlistLayout = GE::Layout::MakeConsecutive()->SetTotalSize(sizeof(Raw::StatList)).Build();
+    auto statlistExLayout = GE::Layout::MakeConsecutive()
                                 ->SetTotalSize(sizeof(Raw::StatListEx))
-                                .AddPointerOffsets<Raw::StatListEx>(0x24,
+                                .AddPointerOffsets<Raw::StatListEx>(0x24u,
                                                                     [](Raw::StatListEx* aStatList) {
                                                                         return aStatList->m_baseStats.m_count * sizeof(Raw::Stat);
                                                                     })
                                 .Build();
-    auto unitLayout = GE::LayoutBuilder::MakeAbsolute()
+    auto unitLayout = GE::Layout::MakeConsecutive()
                           ->SetTotalSize(sizeof(Raw::UnitData<>))
-                          .AddPointerOffsets<Raw::UnitData<>>(0x14,
+                          .AddPointerOffsets<Raw::UnitData<>>(0x14u,
                                                               [](Raw::UnitData<>* aUnit) {
                                                                   if (aUnit->m_unitType == 0)
                                                                   {
@@ -54,7 +55,7 @@ void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
                                                                   }
                                                                   throw std::runtime_error("Unknown unit type");
                                                               })
-                          .AddPointerOffsets<Raw::UnitData<>>(0x2C,
+                          .AddPointerOffsets<Raw::UnitData<>>(0x2Cu,
                                                               [](Raw::UnitData<>* aUnit) {
                                                                   if (aUnit->m_unitType == 0)
                                                                   {
@@ -70,21 +71,22 @@ void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
                                                                   }
                                                                   throw std::runtime_error("Unknown unit type");
                                                               })
-                          .AddPointerOffsets(0x5C, "StatListEx")
-                          .AddPointerOffsets(0x60, "Inventory")
-                          .AddPointerOffsets(0xE4, "UnitData")
+                          .AddPointerOffsets(0x5Cu, "StatListEx")
+                          .AddPointerOffsets(0x60u, "Inventory")
+                          .AddPointerOffsets(0xE4u, "UnitData")
                           .Build();
 
-    aMemoryProcessor.RegisterLayout("DynamicPath", dynPathLayout);
-    aMemoryProcessor.RegisterLayout("Game", gameLayout);
-    aMemoryProcessor.RegisterLayout("Inventory", inventoryLayout);
-    aMemoryProcessor.RegisterLayout("ItemData", itemLayout);
-    aMemoryProcessor.RegisterLayout("MonsterData", monsterLayout);
-    aMemoryProcessor.RegisterLayout("PlayerData", playerDataLayout);
-    aMemoryProcessor.RegisterLayout("StaticPath", staticPathLayout);
-    aMemoryProcessor.RegisterLayout("StatList", statlistLayout);
-    aMemoryProcessor.RegisterLayout("StatListEx", statlistExLayout);
-    aMemoryProcessor.RegisterLayout("UnitData", unitLayout);
+    aMemoryProcessor.RegisterLayout("Base", std::move(baseLayout));
+    aMemoryProcessor.RegisterLayout("DynamicPath", std::move(dynPathLayout));
+    aMemoryProcessor.RegisterLayout("Game", std::move(gameLayout));
+    aMemoryProcessor.RegisterLayout("Inventory", std::move(inventoryLayout));
+    aMemoryProcessor.RegisterLayout("ItemData", std::move(itemLayout));
+    aMemoryProcessor.RegisterLayout("MonsterData", std::move(monsterLayout));
+    aMemoryProcessor.RegisterLayout("PlayerData", std::move(playerDataLayout));
+    aMemoryProcessor.RegisterLayout("StaticPath", std::move(staticPathLayout));
+    aMemoryProcessor.RegisterLayout("StatList", std::move(statlistLayout));
+    aMemoryProcessor.RegisterLayout("StatListEx", std::move(statlistExLayout));
+    aMemoryProcessor.RegisterLayout("UnitData", std::move(unitLayout));
 }
 
 std::string ToString(const GE::ConditionType aType)
@@ -158,17 +160,27 @@ TEST_F(GE_Tests, Test)
     std::shared_ptr<Data::DataAccess> dataAccess;
     std::shared_ptr<Data::SharedData> sharedData;
 
-    GE::MainLayoutCallbacks mainLayoutCallbacks;
-    mainLayoutCallbacks.m_baseLocator = [](PMA::MemoryAccessPtr aMemoryAccess, const std::optional<PMA::MemoryAddress>&) {
+    GE::MainLayoutCallbacks baseCallbacks;
+    baseCallbacks.m_baseLocator = [](PMA::MemoryAccessPtr aMemoryAccess, const std::optional<PMA::MemoryAddress>&) {
+        return aMemoryAccess->GetBaseAddress("D2Client.dll") + 0x113AB4;
+    };
+    baseCallbacks.m_enabler = [](const GE::DataAccessor& aDataAccess, GE::Enabler& aEnabler) {
+        bool inGame = *aDataAccess.Get<uint16_t>("Base");
+    };
+
+    GE::MainLayoutCallbacks inGameCallbacks;
+    inGameCallbacks.m_baseLocator = [](PMA::MemoryAccessPtr aMemoryAccess, const std::optional<PMA::MemoryAddress>&) {
         size_t address = 0;
         EXPECT_NO_THROW(aMemoryAccess->Read("D2Client.dll", 0x12236C, reinterpret_cast<uint8_t*>(&address), sizeof(size_t)));
         return address;
     };
-    mainLayoutCallbacks.m_onReady = [&](std::shared_ptr<GE::DataAccessor> aDataAccess) {
+    inGameCallbacks.m_onReady = [&](std::shared_ptr<GE::DataAccessor> aDataAccess) {
         dataAccess = std::make_shared<Data::DataAccess>(aDataAccess);
         sharedData = std::make_shared<Data::SharedData>(dataAccess);
     };
-    memoryProcessor->AddMainLayout("Game", mainLayoutCallbacks);
+
+    memoryProcessor->AddMainLayout("Base", baseCallbacks);
+    memoryProcessor->AddMainLayout("InGame", inGameCallbacks);
 
     std::cout << "Creating achievements" << std::endl;
     auto achis = GetAchievements();

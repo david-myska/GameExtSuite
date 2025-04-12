@@ -113,43 +113,60 @@ namespace GE
         }
     }
 
-    uint8_t* MemoryProcessorImpl::ReadData(size_t aBytes, size_t aFromAddress, FrameMemoryStorage& aCurrentFrameStorage)
+    uint8_t* MemoryProcessorImpl::Allocate(size_t aBytes, size_t aFromAddress, FrameMemoryStorage& aCurrentFrameStorage)
     {
         uint8_t* storagePtr = aCurrentFrameStorage.Allocate(aBytes);
         GetMetadata(storagePtr)->m_realAddress = aFromAddress;
+        return storagePtr;
+    }
+
+    uint8_t* MemoryProcessorImpl::ReadData(size_t aBytes, size_t aFromAddress, FrameMemoryStorage& aCurrentFrameStorage)
+    {
+        uint8_t* storagePtr = Allocate(aBytes, aFromAddress, aCurrentFrameStorage);
         m_memoryAccess->Read(aFromAddress, storagePtr, aBytes);
         return storagePtr;
     }
 
-    uint8_t* MemoryProcessorImpl::ReadLayout(const std::string& aLayoutType, size_t aFromAddress,
+    uint8_t* MemoryProcessorImpl::ReadLayout(const LayoutId& aLayoutId, size_t aFromAddress,
                                              std::unordered_map<size_t, uint8_t*>& aPointerMap,
                                              FrameMemoryStorage& aCurrentFrameStorage)
     {
-        uint8_t* storagePtr = ReadData(m_layouts[aLayoutType].first, aFromAddress, aCurrentFrameStorage);
-        for (const auto& ptr : m_layouts[aLayoutType].second)
+        auto& layout = m_layouts[aLayoutId];
+        uint8_t* storagePtr = nullptr;
+        if (layout->IsConsecutive())
+        {
+            storagePtr = ReadData(layout->GetTotalSize(), aFromAddress, aCurrentFrameStorage);
+        }
+        else
+        {
+            storagePtr = Allocate(layout->GetTotalSize(), aFromAddress, aCurrentFrameStorage);
+        }
+        for (const auto& ptr : layout->GetPointerOffsets())
         {
             for (size_t i = 0; i < ptr.m_count; ++i)
             {
-                auto castedPtr = reinterpret_cast<size_t*>(storagePtr + ptr.m_offset + i * sizeof(size_t));
-                size_t pointerAddress = *castedPtr;
-                if (pointerAddress == 0)
+                auto localOffset = i * sizeof(size_t);
+                auto castedPtr = reinterpret_cast<size_t*>(storagePtr + ptr.m_mlp.front() + localOffset);
+                if (*castedPtr == 0)
                 {
                     continue;
                 }
-                if (!aPointerMap.contains(pointerAddress))
+                // TODO here I read again already read address, but it should work for now
+                size_t finalAddress = m_memoryAccess->Dereference(aFromAddress + localOffset, ptr.m_mlp);
+                if (!aPointerMap.contains(finalAddress))
                 {
-                    if (std::holds_alternative<LayoutBuilder::DynamicLayoutFnc>(ptr.m_pointeeType))
+                    if (std::holds_alternative<Layout::LayoutIdProvider>(ptr.m_pointeeType))
                     {
-                        auto& dynamicLayoutFnc = std::get<LayoutBuilder::DynamicLayoutFnc>(ptr.m_pointeeType);
-                        aPointerMap[pointerAddress] = ReadLayout(dynamicLayoutFnc(storagePtr), pointerAddress, aPointerMap,
-                                                                 aCurrentFrameStorage);
+                        auto& layoutIdProvider = std::get<Layout::LayoutIdProvider>(ptr.m_pointeeType);
+                        aPointerMap[finalAddress] = ReadLayout(layoutIdProvider(storagePtr), finalAddress, aPointerMap,
+                                                               aCurrentFrameStorage);
                     }
                     else
                     {
-                        auto& dynamicDataFnc = std::get<LayoutBuilder::DynamicDataFnc>(ptr.m_pointeeType);
-                        aPointerMap[pointerAddress] = ReadData(dynamicDataFnc(storagePtr), pointerAddress, aCurrentFrameStorage);
+                        auto& dataSizeProvider = std::get<Layout::DataSizeProvider>(ptr.m_pointeeType);
+                        aPointerMap[finalAddress] = ReadData(dataSizeProvider(storagePtr), finalAddress, aCurrentFrameStorage);
                     }
-                    *castedPtr = reinterpret_cast<size_t>(aPointerMap[pointerAddress]);
+                    *castedPtr = reinterpret_cast<size_t>(aPointerMap[finalAddress]);
                 }
             }
         }
@@ -188,7 +205,7 @@ namespace GE
         m_refreshRateMs = aRateMs.value_or(1000 / aFramesToKeep);
     }
 
-    void MemoryProcessorImpl::RegisterLayout(const LayoutId& aLayoutType, LayoutBuilder::Absolute::Layout aLayout)
+    void MemoryProcessorImpl::RegisterLayout(const LayoutId& aLayoutType, std::unique_ptr<Layout> aLayout)
     {
         EnsureNotRunning();
         m_layouts[aLayoutType] = std::move(aLayout);
