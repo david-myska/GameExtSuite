@@ -78,6 +78,7 @@ namespace GE
         void SetUpdateCallback(const std::function<void(const DataAccessor&)>& aCallback, size_t aFramesToKeep = 2,
                                std::optional<size_t> aRateMs = {}) override;
         void Start() override;
+        void RequestStart() override;
         void Stop() override;
         void RequestStop() override;
         void Wait() override;

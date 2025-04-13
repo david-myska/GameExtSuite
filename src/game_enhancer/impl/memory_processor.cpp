@@ -57,7 +57,7 @@ namespace GE
 
     void MemoryProcessorImpl::ReadMainLayouts()
     {
-        FrameMemoryStorage currentFrameStorage;
+        FrameMemoryStorage& currentFrameStorage = m_storedFrames->emplace_back(FrameMemoryStorage{});
         std::unordered_map<size_t, uint8_t*> pointerMap;
         for (int i = 0; i < m_mainLayoutOrder.size(); ++i)
         {
@@ -78,7 +78,6 @@ namespace GE
                 (*layout.m_callbacks.m_enabler)(*m_dataAccessor, enabler);
             }
         }
-        m_storedFrames->push_back(std::move(currentFrameStorage));
         if (m_storedFrames->size() > m_framesToKeep)
         {
             m_storedFrames->pop_front();
@@ -127,6 +126,7 @@ namespace GE
         return storagePtr;
     }
 
+    // TODO refactor this + Layout logic
     uint8_t* MemoryProcessorImpl::ReadLayout(const LayoutId& aLayoutId, size_t aFromAddress,
                                              std::unordered_map<size_t, uint8_t*>& aPointerMap,
                                              FrameMemoryStorage& aCurrentFrameStorage)
@@ -141,18 +141,28 @@ namespace GE
         {
             storagePtr = Allocate(layout->GetTotalSize(), aFromAddress, aCurrentFrameStorage);
         }
+        size_t localOffset = 0;
         for (const auto& ptr : layout->GetPointerOffsets())
         {
             for (size_t i = 0; i < ptr.m_count; ++i)
             {
-                auto localOffset = i * sizeof(size_t);
-                auto castedPtr = reinterpret_cast<size_t*>(storagePtr + ptr.m_mlp.front() + localOffset);
-                if (*castedPtr == 0)
+                size_t* castedPtr = nullptr;
+                if (layout->IsConsecutive())
                 {
-                    continue;
+                    localOffset = ptr.m_mlp.front() + i * sizeof(size_t);
+                    castedPtr = reinterpret_cast<size_t*>(storagePtr + localOffset);
+                    if (*castedPtr == 0)
+                    {
+                        continue;
+                    }
+                }
+                else
+                {
+                    castedPtr = reinterpret_cast<size_t*>(storagePtr + localOffset);
+                    localOffset += sizeof(size_t);
                 }
                 // TODO here I read again already read address, but it should work for now
-                size_t finalAddress = m_memoryAccess->Dereference(aFromAddress + localOffset, ptr.m_mlp);
+                size_t finalAddress = m_memoryAccess->Dereference(aFromAddress + i * sizeof(size_t), ptr.m_mlp);
                 if (!aPointerMap.contains(finalAddress))
                 {
                     if (std::holds_alternative<Layout::LayoutIdProvider>(ptr.m_pointeeType))
@@ -166,8 +176,8 @@ namespace GE
                         auto& dataSizeProvider = std::get<Layout::DataSizeProvider>(ptr.m_pointeeType);
                         aPointerMap[finalAddress] = ReadData(dataSizeProvider(storagePtr), finalAddress, aCurrentFrameStorage);
                     }
-                    *castedPtr = reinterpret_cast<size_t>(aPointerMap[finalAddress]);
                 }
+                *castedPtr = reinterpret_cast<size_t>(aPointerMap[finalAddress]);
             }
         }
         return storagePtr;
@@ -225,7 +235,15 @@ namespace GE
         m_storedFrames->clear();
     }
 
-    void MemoryProcessorImpl::Start()
+    void MemoryProcessorImpl::Start() {
+        RequestStart();
+        while (!m_running && m_onAttachedToken)
+        {
+            std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        }
+    }
+
+    void MemoryProcessorImpl::RequestStart()
     {
         EnsureNotRunning();
         if (!m_updateCallback)

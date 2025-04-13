@@ -87,8 +87,15 @@ namespace GE
 
         /*
          * Starts the main loop. Update callbacks will be called at the specified refresh rate.
+         * This call is blocking and returns only after successfully connecting to the target process and starting the main loop.
          */
         virtual void Start() = 0;
+
+        /*
+         * Starts the main loop. Update callbacks will be called at the specified refresh rate.
+         * Returns immediately.
+         */
+        virtual void RequestStart() = 0;
 
         /*
          * Stops the main loop. OnRefresh callbacks will no longer be called.

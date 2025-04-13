@@ -13,9 +13,15 @@ using namespace D2;
 using TestAchiBuilder = GE::AchievementBuilder<std::string, GE::None, Data::SharedData, Data::DataAccess>;
 using TestAchievement = decltype(std::declval<TestAchiBuilder>().Build());
 
+struct ScatteredLayout
+{
+    uint16_t* m_inGame;
+};
+
 void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
 {
-    auto baseLayout = GE::Layout::MakeConsecutive()->SetTotalSize(sizeof(uint16_t)).Build();
+    auto baseLayout =
+        GE::Layout::MakeScattered()->SetTotalSize(sizeof(ScatteredLayout)).AddPointerOffsets(0x113AB4u, sizeof(uint16_t)).Build();
     auto dynPathLayout = GE::Layout::MakeConsecutive()->SetTotalSize(sizeof(Raw::DynamicPath)).Build();
     auto gameLayout = GE::Layout::MakeConsecutive()
                           ->SetTotalSize(sizeof(Raw::Game))
@@ -162,10 +168,11 @@ TEST_F(GE_Tests, Test)
 
     GE::MainLayoutCallbacks baseCallbacks;
     baseCallbacks.m_baseLocator = [](PMA::MemoryAccessPtr aMemoryAccess, const std::optional<PMA::MemoryAddress>&) {
-        return aMemoryAccess->GetBaseAddress("D2Client.dll") + 0x113AB4;
+        return aMemoryAccess->GetBaseAddress("D2Client.dll");
     };
     baseCallbacks.m_enabler = [](const GE::DataAccessor& aDataAccess, GE::Enabler& aEnabler) {
-        bool inGame = *aDataAccess.Get<uint16_t>("Base");
+        auto baseLayout = aDataAccess.Get<ScatteredLayout>("Base");
+        std::cout << "BaseLayout.InGame: " << *baseLayout->m_inGame << std::endl;
     };
 
     GE::MainLayoutCallbacks inGameCallbacks;
@@ -180,29 +187,30 @@ TEST_F(GE_Tests, Test)
     };
 
     memoryProcessor->AddMainLayout("Base", baseCallbacks);
-    memoryProcessor->AddMainLayout("InGame", inGameCallbacks);
+    // memoryProcessor->AddMainLayout("InGame", inGameCallbacks);
 
     std::cout << "Creating achievements" << std::endl;
     auto achis = GetAchievements();
 
     memoryProcessor->SetUpdateCallback([&](const GE::DataAccessor&) {
-        dataAccess->AdvanceFrame();
-        sharedData->Update();
-        for (auto& a : achis)
-        {
-            a->Update(*dataAccess, *sharedData);
-        }
-        PrintAchievements(achis);
-        if (std::all_of(achis.begin(), achis.end(), [&memoryProcessor](const auto& a) {
-                return a->GetStatus() == GE::Status::Completed || a->GetStatus() == GE::Status::Failed;
-            }))
-        {
-            std::cout << "All achievements completed" << std::endl;
-            memoryProcessor->RequestStop();
-        }
+        // dataAccess->AdvanceFrame();
+        // sharedData->Update();
+        // for (auto& a : achis)
+        // {
+        //     a->Update(*dataAccess, *sharedData);
+        // }
+        // PrintAchievements(achis);
+        // if (std::all_of(achis.begin(), achis.end(), [&memoryProcessor](const auto& a) {
+        //         return a->GetStatus() == GE::Status::Completed || a->GetStatus() == GE::Status::Failed;
+        //     }))
+        // {
+        //     std::cout << "All achievements completed" << std::endl;
+        //     memoryProcessor->RequestStop();
+        // }
     });
 
     std::cout << "Starting memoryProcessor" << std::endl;
     memoryProcessor->Start();
+    std::cout << "Waiting" << std::endl;
     memoryProcessor->Wait();
 }
