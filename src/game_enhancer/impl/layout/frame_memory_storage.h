@@ -10,10 +10,11 @@ namespace GE
     struct Metadata
     {
         size_t m_realAddress = 0;
+        size_t m_bytesRead = 0;
         bool m_dirty = false;
     };
 
-    Metadata* GetMetadata(uint8_t* fromData);
+    Metadata* GetMetadata(const uint8_t* fromData);
 
     class FrameMemoryStorage
     {

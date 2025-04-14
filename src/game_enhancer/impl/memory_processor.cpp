@@ -122,7 +122,7 @@ namespace GE
     uint8_t* MemoryProcessorImpl::ReadData(size_t aBytes, size_t aFromAddress, FrameMemoryStorage& aCurrentFrameStorage)
     {
         uint8_t* storagePtr = Allocate(aBytes, aFromAddress, aCurrentFrameStorage);
-        m_memoryAccess->Read(aFromAddress, storagePtr, aBytes);
+        GetMetadata(storagePtr)->m_bytesRead = m_memoryAccess->Read(aFromAddress, storagePtr, aBytes);
         return storagePtr;
     }
 
@@ -162,7 +162,11 @@ namespace GE
                     localOffset += sizeof(size_t);
                 }
                 // TODO here I read again already read address, but it should work for now
-                size_t finalAddress = m_memoryAccess->Dereference(aFromAddress + i * sizeof(size_t), ptr.m_mlp);
+                auto finalAddress = m_memoryAccess->Dereference(aFromAddress + i * sizeof(size_t), ptr.m_mlp);
+                if (layout->IsConsecutive())
+                {
+                    m_memoryAccess->Read(finalAddress, PMA::mem_cast(finalAddress), sizeof(finalAddress));
+                }
                 if (!aPointerMap.contains(finalAddress))
                 {
                     if (std::holds_alternative<Layout::LayoutIdProvider>(ptr.m_pointeeType))
@@ -235,7 +239,8 @@ namespace GE
         m_storedFrames->clear();
     }
 
-    void MemoryProcessorImpl::Start() {
+    void MemoryProcessorImpl::Start()
+    {
         RequestStart();
         while (!m_running && m_onAttachedToken)
         {

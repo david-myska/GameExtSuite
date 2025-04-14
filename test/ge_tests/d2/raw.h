@@ -428,7 +428,7 @@ namespace D2::Raw
     UnitData<>* m_pObjectList[128]    = {};
     UnitData<ItemData>* m_pItemList[128]    = {};
     UnitData<>* m_pMissileList[128]    = {};
-    UnitData<>* m_pTileList[128]    = {};
+    UnitData<>* m_pTileList    = {};
                                            //  -> second index is GUID & 127, BEWARE: since ever, missiles are array #4 and items are array #3 (so type3=index4 and type4=index3)
     uint32_t m_uniqueFlags[128] = {};      //  +1B24 - UniqueFlags[128] - 128 DWORDS worth of flags that control if a unique item got spawned [room for 4096]
     uint32_t m_pNpcControl      = {};      //  +1D24 - pNpcControl - a controller holding all npc info (like store inventories, merc list)

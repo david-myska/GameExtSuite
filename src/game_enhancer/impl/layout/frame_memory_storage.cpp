@@ -4,9 +4,9 @@
 
 namespace GE
 {
-    Metadata* GetMetadata(uint8_t* fromData)
+    Metadata* GetMetadata(const uint8_t* fromData)
     {
-        return reinterpret_cast<Metadata*>(fromData - sizeof(Metadata));
+        return reinterpret_cast<Metadata*>(const_cast<uint8_t*>(fromData) - sizeof(Metadata));
     }
 
     uint8_t* FrameMemoryStorage::Allocate(size_t aSize)

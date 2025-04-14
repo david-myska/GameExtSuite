@@ -4,6 +4,7 @@
 
 #include "d2/data.h"
 #include "game_enhancer/achis/achievement.h"
+#include "game_enhancer/impl/layout/frame_memory_storage.h"
 #include "game_enhancer/memory_layout_builder.h"
 #include "game_enhancer/memory_processor.h"
 #include "pma/logging/console_logger.h"
@@ -38,7 +39,7 @@ void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
     auto statlistLayout = GE::Layout::MakeConsecutive()->SetTotalSize(sizeof(Raw::StatList)).Build();
     auto statlistExLayout = GE::Layout::MakeConsecutive()
                                 ->SetTotalSize(sizeof(Raw::StatListEx))
-                                .AddPointerOffsets<Raw::StatListEx>(0x24u,
+                                .AddPointerOffsets<Raw::StatListEx>(0x48u,
                                                                     [](Raw::StatListEx* aStatList) {
                                                                         return aStatList->m_baseStats.m_count * sizeof(Raw::Stat);
                                                                     })
@@ -59,7 +60,8 @@ void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
                                                                   {
                                                                       return "ItemData";
                                                                   }
-                                                                  throw std::runtime_error("Unknown unit type");
+                                                                  throw std::runtime_error(
+                                                                      std::format("Unknown unit type: {}", aUnit->m_unitType));
                                                               })
                           .AddPointerOffsets<Raw::UnitData<>>(0x2Cu,
                                                               [](Raw::UnitData<>* aUnit) {
@@ -75,7 +77,8 @@ void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
                                                                   {
                                                                       return "StaticPath";
                                                                   }
-                                                                  throw std::runtime_error("Unknown unit type");
+                                                                  throw std::runtime_error(
+                                                                      std::format("Unknown unit type: {}", aUnit->m_unitType));
                                                               })
                           .AddPointerOffsets(0x5Cu, "StatListEx")
                           .AddPointerOffsets(0x60u, "Inventory")
@@ -152,7 +155,7 @@ std::vector<TestAchievement> GetAchievements()
 
 TEST_F(GE_Tests, Test)
 {
-    // PMA::Setup::InjectLogger(std::make_unique<PMA::ConsoleLogger>(), PMA::LogLevel::Verbose);
+    PMA::Setup::InjectLogger(std::make_unique<PMA::ConsoleLogger>(), PMA::LogLevel::Warning);
     auto config = PMA::TargetProcess::Config{
         .windowInfo = PMA::TargetProcess::Config::WindowInfo{.windowTitle = "Diablo II"},
         .modules = {"D2Client.dll", "D2Common.dll", "D2Win.dll", "D2Lang.dll", "D2Sigma.dll", "D2Game.dll"},
@@ -172,27 +175,44 @@ TEST_F(GE_Tests, Test)
     };
     baseCallbacks.m_enabler = [](const GE::DataAccessor& aDataAccess, GE::Enabler& aEnabler) {
         auto baseLayout = aDataAccess.Get<ScatteredLayout>("Base");
-        std::cout << "BaseLayout.InGame: " << *baseLayout->m_inGame << std::endl;
+        if (*baseLayout->m_inGame)
+        {
+            aEnabler.Enable("Game");
+        }
+        else
+        {
+            aEnabler.Disable("Game");
+        }
     };
 
     GE::MainLayoutCallbacks inGameCallbacks;
     inGameCallbacks.m_baseLocator = [](PMA::MemoryAccessPtr aMemoryAccess, const std::optional<PMA::MemoryAddress>&) {
         size_t address = 0;
-        EXPECT_NO_THROW(aMemoryAccess->Read("D2Client.dll", 0x12236C, reinterpret_cast<uint8_t*>(&address), sizeof(size_t)));
+        EXPECT_NO_THROW(aMemoryAccess->Read("D2Client.dll", 0x12236C, PMA::mem_cast(address), sizeof(size_t)));
         return address;
     };
     inGameCallbacks.m_onReady = [&](std::shared_ptr<GE::DataAccessor> aDataAccess) {
         dataAccess = std::make_shared<Data::DataAccess>(aDataAccess);
         sharedData = std::make_shared<Data::SharedData>(dataAccess);
     };
+    inGameCallbacks.m_onDisabled = [&](const GE::DataAccessor&) {
+        dataAccess.reset();
+        sharedData.reset();
+    };
 
     memoryProcessor->AddMainLayout("Base", baseCallbacks);
-    // memoryProcessor->AddMainLayout("InGame", inGameCallbacks);
+    memoryProcessor->AddMainLayout("Game", inGameCallbacks);
 
     std::cout << "Creating achievements" << std::endl;
     auto achis = GetAchievements();
 
-    memoryProcessor->SetUpdateCallback([&](const GE::DataAccessor&) {
+    memoryProcessor->SetUpdateCallback([&](const GE::DataAccessor& aTmp) {
+        if (!dataAccess || !sharedData)
+        {
+            std::cout << "Update - No Game" << std::endl;
+            return;
+        }
+        std::cout << "Update - Game" << std::endl;
         // dataAccess->AdvanceFrame();
         // sharedData->Update();
         // for (auto& a : achis)
