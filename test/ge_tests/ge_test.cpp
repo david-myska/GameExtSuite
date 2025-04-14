@@ -11,8 +11,10 @@
 
 using namespace D2;
 
-using TestAchiBuilder = GE::AchievementBuilder<std::string, GE::None, Data::SharedData, Data::DataAccess>;
-using TestAchievement = decltype(std::declval<TestAchiBuilder>().Build());
+template <typename CustomData = GE::None>
+using TAB = GE::AchievementBuilder<std::string, CustomData, Data::SharedData, Data::DataAccess>;
+
+using TestAchi = std::unique_ptr<GE::Achievement<std::string, Data::SharedData, Data::DataAccess>>;
 
 struct ScatteredLayout
 {
@@ -120,7 +122,7 @@ std::string ToString(const GE::ConditionType aType)
     return "Unknown";
 }
 
-void PrintAchievement(const TestAchievement& aAchievement)
+void PrintAchievement(const TestAchi& aAchievement)
 {
     std::cout << "--- " << aAchievement->GetMetadata() << " ---" << std::endl;
     for (uint32_t i = 0; i < static_cast<uint32_t>(GE::ConditionType::All); ++i)
@@ -137,7 +139,7 @@ void PrintAchievement(const TestAchievement& aAchievement)
     }
 }
 
-void PrintAchievements(const std::vector<TestAchievement>& aAchievements)
+void PrintAchievements(const std::vector<TestAchi>& aAchievements)
 {
     for (const auto& a : aAchievements)
     {
@@ -146,10 +148,56 @@ void PrintAchievements(const std::vector<TestAchievement>& aAchievements)
     }
 }
 
-std::vector<TestAchievement> GetAchievements()
+struct TestAchiCD
 {
-    std::vector<TestAchievement> achis;
-    achis.push_back(TestAchiBuilder("Name").Build());
+    uint32_t m_activationFrame = 0;
+};
+
+std::vector<TestAchi> GetAchievements()
+{
+    std::vector<TestAchi> achis;
+    achis.push_back(
+        TAB<TestAchiCD>("ALPHA_1")
+            .Add(GE::ConditionType::Activator, "Activ_1",
+                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, TestAchiCD& aCustom) {
+                     return true;
+                 })
+            .OnPass(GE::ConditionType::Activator,
+                    [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, TestAchiCD& aCustom) {
+                        aCustom.m_activationFrame = aDataAccess.GetCurrentGameFrame();
+                    })
+            .Add(GE::ConditionType::Completer, "Comp_1",
+                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, TestAchiCD& aCustom) {
+                     return aDataAccess.GetCurrentGameFrame() > aCustom.m_activationFrame + 25 * 10;
+                 })
+            .Build());
+    achis.push_back(
+        TAB<uint32_t>("ALPHA_2")
+            .Add(GE::ConditionType::Precondition, "Pre_1",
+                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
+                     return true;
+                 })
+            .Add(GE::ConditionType::Activator, "Activ_1",
+                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
+                     return true;
+                 })
+            .OnPass(GE::ConditionType::Activator,
+                    [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
+                        aCustom = aDataAccess.GetCurrentGameFrame();
+                    })
+            .Add(GE::ConditionType::Completer, "Comp_1",
+                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
+                     return false;
+                 })
+            .Add(GE::ConditionType::Failer, "Fail_1",
+                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
+                     return aDataAccess.GetCurrentGameFrame() > aCustom + 25 * 5;
+                 })
+            .Add(GE::ConditionType::Reseter, "Reset_1",
+                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
+                     return aDataAccess.GetCurrentGameFrame() > aCustom + 25 * 10;
+                 })
+            .Build());
     return achis;
 }
 
@@ -209,24 +257,22 @@ TEST_F(GE_Tests, Test)
     memoryProcessor->SetUpdateCallback([&](const GE::DataAccessor& aTmp) {
         if (!dataAccess || !sharedData)
         {
-            std::cout << "Update - No Game" << std::endl;
             return;
         }
-        std::cout << "Update - Game" << std::endl;
-        // dataAccess->AdvanceFrame();
-        // sharedData->Update();
-        // for (auto& a : achis)
-        // {
-        //     a->Update(*dataAccess, *sharedData);
-        // }
-        // PrintAchievements(achis);
-        // if (std::all_of(achis.begin(), achis.end(), [&memoryProcessor](const auto& a) {
-        //         return a->GetStatus() == GE::Status::Completed || a->GetStatus() == GE::Status::Failed;
-        //     }))
-        // {
-        //     std::cout << "All achievements completed" << std::endl;
-        //     memoryProcessor->RequestStop();
-        // }
+        dataAccess->AdvanceFrame();
+        sharedData->Update();
+        for (auto& a : achis)
+        {
+            a->Update(*dataAccess, *sharedData);
+        }
+        PrintAchievements(achis);
+        if (std::all_of(achis.begin(), achis.end(), [&memoryProcessor](const auto& a) {
+                return a->GetStatus() == GE::Status::Completed || a->GetStatus() == GE::Status::Failed;
+            }))
+        {
+            std::cout << "All achievements completed" << std::endl;
+            memoryProcessor->RequestStop();
+        }
     });
 
     std::cout << "Starting memoryProcessor" << std::endl;

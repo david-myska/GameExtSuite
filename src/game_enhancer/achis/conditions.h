@@ -84,8 +84,7 @@ namespace GE
     };
 
     template <typename... CallableArgs>
-    std::vector<bool> EvaluateEach(const std::vector<Condition<CallableArgs...>>& aConditions,
-                                   CallableArgs&&... aArgs)
+    std::vector<bool> EvaluateEach(const std::vector<Condition<CallableArgs...>>& aConditions, CallableArgs&&... aArgs)
     {
         std::vector<bool> result;
         result.reserve(aConditions.size());
@@ -129,6 +128,10 @@ namespace GE
         Conditions(std::unordered_map<ConditionType, std::vector<Condition<CallableArgs...>>> aConditionsMap)
             : m_conditionsMap(std::move(aConditionsMap))
         {
+            for (uint32_t conditionType = 0; conditionType < static_cast<uint32_t>(ConditionType::All); ++conditionType)
+            {
+                m_conditionsMap.try_emplace(static_cast<ConditionType>(conditionType));
+            }
         }
 
         std::vector<bool> Evaluate(ConditionType aConditionType, CallableArgs&&... aArgs) const

@@ -288,6 +288,7 @@ namespace D2::Data
         GameType GetGameType() const { return m_gameType; }
 
         // Frame dependent
+        uint32_t GetCurrentGameFrame() const { return m_dataAccess->Get<Raw::Game>("Game")->m_gameFrame; }
 
         const Players& GetPlayers(size_t aFrame = 0) const { return m_frames.at(aFrame)->m_players; }
 
