@@ -21,6 +21,11 @@ struct ScatteredLayout
     uint16_t* m_inGame;
 };
 
+struct GameUtilsLayout
+{
+    D2::Data::Zone* m_zone;
+};
+
 void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
 {
     auto baseLayout =
@@ -86,6 +91,10 @@ void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
                           .AddPointerOffsets(0x60u, "Inventory")
                           .AddPointerOffsets(0xE4u, "UnitData")
                           .Build();
+    auto gameUtilsLayout = GE::Layout::MakeScattered()
+                               ->SetTotalSize(sizeof(GameUtilsLayout))
+                               .AddPointerOffsets(PMA::MultiLevelPointer{0x11C070u, 0x38u, 0x150u}, sizeof(D2::Data::Zone))
+                               .Build();
 
     aMemoryProcessor.RegisterLayout("Base", std::move(baseLayout));
     aMemoryProcessor.RegisterLayout("DynamicPath", std::move(dynPathLayout));
@@ -98,6 +107,7 @@ void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
     aMemoryProcessor.RegisterLayout("StatList", std::move(statlistLayout));
     aMemoryProcessor.RegisterLayout("StatListEx", std::move(statlistExLayout));
     aMemoryProcessor.RegisterLayout("UnitData", std::move(unitLayout));
+    aMemoryProcessor.RegisterLayout("GameUtils", std::move(gameUtilsLayout));
 }
 
 std::string ToString(const GE::ConditionType aType)
@@ -221,15 +231,21 @@ TEST_F(GE_Tests, Test)
     baseCallbacks.m_baseLocator = [](PMA::MemoryAccessPtr aMemoryAccess, const std::optional<PMA::MemoryAddress>&) {
         return aMemoryAccess->GetBaseAddress("D2Client.dll");
     };
+    GE::MainLayoutCallbacks gameUtilsCallbacks;
+    gameUtilsCallbacks.m_baseLocator = [](PMA::MemoryAccessPtr aMemoryAccess, const std::optional<PMA::MemoryAddress>&) {
+        return aMemoryAccess->GetBaseAddress("D2Client.dll");
+    };
     baseCallbacks.m_enabler = [](const GE::DataAccessor& aDataAccess, GE::Enabler& aEnabler) {
         auto baseLayout = aDataAccess.Get<ScatteredLayout>("Base");
         if (*baseLayout->m_inGame)
         {
             aEnabler.Enable("Game");
+            aEnabler.Enable("GameUtils");
         }
         else
         {
             aEnabler.Disable("Game");
+            aEnabler.Disable("GameUtils");
         }
     };
 
@@ -250,6 +266,7 @@ TEST_F(GE_Tests, Test)
 
     memoryProcessor->AddMainLayout("Base", baseCallbacks);
     memoryProcessor->AddMainLayout("Game", inGameCallbacks);
+    memoryProcessor->AddMainLayout("GameUtils", gameUtilsCallbacks);
 
     std::cout << "Creating achievements" << std::endl;
     auto achis = GetAchievements();
@@ -259,6 +276,7 @@ TEST_F(GE_Tests, Test)
         {
             return;
         }
+        std::cout << to_string(*aTmp.Get<GameUtilsLayout>("GameUtils")->m_zone) << std::endl;
         dataAccess->AdvanceFrame();
         sharedData->Update();
         for (auto& a : achis)

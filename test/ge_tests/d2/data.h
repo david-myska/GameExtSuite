@@ -7,6 +7,7 @@
 
 #include "raw.h"
 #include "stats.h"
+#include "zone.h"
 
 #include "game_enhancer/data_accessor.h"
 
@@ -17,6 +18,15 @@ namespace D2::Data
         Normal,
         Nightmare,
         Hell
+    };
+
+    enum class Act
+    {
+        Act1,
+        Act2,
+        Act3,
+        Act4,
+        Act5
     };
 
     enum class GameType
