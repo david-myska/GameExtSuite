@@ -83,13 +83,6 @@ namespace GE
 
             void ProcessInactive(const DataAccess& aDataAccess, const SharedData& aSharedData)
             {
-                auto& preconditionsCached = m_cachedConditions[ConditionType::Precondition];
-                preconditionsCached.m_results = m_conditions.Evaluate(ConditionType::Precondition, aDataAccess, aSharedData,
-                                                                      m_customData);
-                if (!EvaluateAnd(preconditionsCached.m_results))
-                {
-                    return;
-                }
                 auto& activatorsCached = m_cachedConditions[ConditionType::Activator];
                 activatorsCached.m_results = m_conditions.Evaluate(ConditionType::Activator, aDataAccess, aSharedData,
                                                                    m_customData);
@@ -176,6 +169,14 @@ namespace GE
 
             void Update(const DataAccess& aDataAccess, const SharedData& aSharedData) override
             {
+                auto& preconditionsCached = m_cachedConditions[ConditionType::Precondition];
+                preconditionsCached.m_results = m_conditions.Evaluate(ConditionType::Precondition, aDataAccess, aSharedData,
+                                                                      m_customData);
+                if (!EvaluateAnd(preconditionsCached.m_results))
+                {
+                    return;
+                }
+
                 ResetCaches();
 
                 switch (m_status)

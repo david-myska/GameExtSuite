@@ -2,7 +2,7 @@
 
 #include <utility>
 
-#include "d2/data.h"
+#include "d2/achis.h"
 #include "game_enhancer/achis/achievement.h"
 #include "game_enhancer/impl/layout/frame_memory_storage.h"
 #include "game_enhancer/memory_layout_builder.h"
@@ -10,11 +10,6 @@
 #include "pma/logging/console_logger.h"
 
 using namespace D2;
-
-template <typename CustomData = GE::None>
-using TAB = GE::AchievementBuilder<std::string, CustomData, Data::SharedData, Data::DataAccess>;
-
-using TestAchi = std::unique_ptr<GE::Achievement<std::string, Data::SharedData, Data::DataAccess>>;
 
 struct ScatteredLayout
 {
@@ -163,54 +158,6 @@ struct TestAchiCD
     uint32_t m_activationFrame = 0;
 };
 
-std::vector<TestAchi> GetAchievements()
-{
-    std::vector<TestAchi> achis;
-    achis.push_back(
-        TAB<TestAchiCD>("ALPHA_1")
-            .Add(GE::ConditionType::Activator, "Activ_1",
-                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, TestAchiCD& aCustom) {
-                     return true;
-                 })
-            .OnPass(GE::ConditionType::Activator,
-                    [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, TestAchiCD& aCustom) {
-                        aCustom.m_activationFrame = aDataAccess.GetCurrentGameFrame();
-                    })
-            .Add(GE::ConditionType::Completer, "Comp_1",
-                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, TestAchiCD& aCustom) {
-                     return aDataAccess.GetCurrentGameFrame() > aCustom.m_activationFrame + 25 * 10;
-                 })
-            .Build());
-    achis.push_back(
-        TAB<uint32_t>("ALPHA_2")
-            .Add(GE::ConditionType::Precondition, "Pre_1",
-                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
-                     return true;
-                 })
-            .Add(GE::ConditionType::Activator, "Activ_1",
-                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
-                     return true;
-                 })
-            .OnPass(GE::ConditionType::Activator,
-                    [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
-                        aCustom = aDataAccess.GetCurrentGameFrame();
-                    })
-            .Add(GE::ConditionType::Completer, "Comp_1",
-                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
-                     return false;
-                 })
-            .Add(GE::ConditionType::Failer, "Fail_1",
-                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
-                     return aDataAccess.GetCurrentGameFrame() > aCustom + 25 * 5;
-                 })
-            .Add(GE::ConditionType::Reseter, "Reset_1",
-                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
-                     return aDataAccess.GetCurrentGameFrame() > aCustom + 25 * 10;
-                 })
-            .Build());
-    return achis;
-}
-
 TEST_F(GE_Tests, Test)
 {
     PMA::Setup::InjectLogger(std::make_unique<PMA::ConsoleLogger>(), PMA::LogLevel::Warning);
@@ -269,7 +216,7 @@ TEST_F(GE_Tests, Test)
     memoryProcessor->AddMainLayout("GameUtils", gameUtilsCallbacks);
 
     std::cout << "Creating achievements" << std::endl;
-    auto achis = GetAchievements();
+    auto achis = D2::CreateAchievements();
 
     memoryProcessor->SetUpdateCallback([&](const GE::DataAccessor& aTmp) {
         if (!dataAccess || !sharedData)

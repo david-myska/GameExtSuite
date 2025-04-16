@@ -230,6 +230,20 @@ namespace D2::Data
         std::optional<const Item*> m_inHand;
     };
 
+    struct Misc
+    {
+        Misc(Zone aZone)
+            : m_zone(aZone)
+        {
+        }
+
+        Zone GetZone() const { return m_zone; }
+
+    private:
+        const Zone m_zone;
+
+    };
+
     template <typename T>
     std::set<T> Union(const std::set<T>& l, const std::set<T>& r)
     {
@@ -306,6 +320,8 @@ namespace D2::Data
 
         const Items& GetItems(size_t aFrame = 0) const { return m_frames.at(aFrame)->m_items; }
 
+        const Misc& GetMisc(size_t aFrame = 0) const { return m_frames.at(aFrame)->m_misc; }
+
     private:
         std::shared_ptr<GE::DataAccessor> m_dataAccess;
 
@@ -318,12 +334,14 @@ namespace D2::Data
                 : m_players(aDataAccess.Get<Raw::Game>("Game", aFrame)->m_pPlayerList)
                 , m_monsters(aDataAccess.Get<Raw::Game>("Game", aFrame)->m_pMonsterList)
                 , m_items(aDataAccess.Get<Raw::Game>("Game", aFrame)->m_pItemList)
+                , m_misc(*aDataAccess.Get<GameUtilsLayout>("GameUtils")->m_zone)
             {
             }
 
             Players m_players;
             Monsters m_monsters;
             Items m_items;
+            Misc m_misc;
         };
 
         std::vector<std::unique_ptr<FrameData>> m_frames;
