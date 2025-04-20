@@ -11,23 +11,27 @@ namespace D2
 
     using D2Achi = std::unique_ptr<GE::Achievement<std::string, Data::SharedData, Data::DataAccess>>;
 
+    struct ClearTristramCD
+    {
+    };
+
     std::vector<D2Achi> CreateAchievements()
     {
         std::vector<D2Achi> achis;
         achis.push_back(
-            BLD<TestAchiCD>("ClearTristram")
+            BLD<ClearTristramCD>("ClearTristram")
                 .Add(GE::ConditionType::Precondition, "In Tristram",
-                     [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, TestAchiCD& aCustom) {
+                     [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, ClearTristramCD& aCustom) {
                          return aDataAccess.GetMisc().GetZone() == Data::Zone::Act1_Tristram;
                      })
                 .Add(GE::ConditionType::Activator, "Enter Tristram",
-                     [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, TestAchiCD& aCustom) {
+                     [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, ClearTristramCD& aCustom) {
                          return true;
                      })
                 .Add(GE::ConditionType::Completer, "Kill all monsters in Tristram",
-                     [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, TestAchiCD& aCustom) {
-                        // TODO store seen monsters in custom data, when all dead, check that we have at least 100
-                         return aDataAccess.GetCurrentGameFrame() > aCustom.m_activationFrame + 25 * 10;
+                     [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, ClearTristramCD& aCustom) {
+                         // TODO store seen monsters in custom data, when all dead, check that we have at least 100
+                         return false;
                      })
                 .Build());
         achis.push_back(

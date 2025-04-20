@@ -11,16 +11,6 @@
 
 using namespace D2;
 
-struct ScatteredLayout
-{
-    uint16_t* m_inGame;
-};
-
-struct GameUtilsLayout
-{
-    D2::Data::Zone* m_zone;
-};
-
 void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
 {
     auto baseLayout =
@@ -28,10 +18,16 @@ void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
     auto dynPathLayout = GE::Layout::MakeConsecutive()->SetTotalSize(sizeof(Raw::DynamicPath)).Build();
     auto gameLayout = GE::Layout::MakeConsecutive()
                           ->SetTotalSize(sizeof(Raw::Game))
-                          .AddPointerOffsets(0x1120u, "UnitData", 128)
+                          .AddPointerOffsets(0x1120u + 0 * 128 * 4, "UnitData", 128)
                           .AddPointerOffsets(0x1120u + 1 * 128 * 4, "UnitData", 128)
                           .AddPointerOffsets(0x1120u + 3 * 128 * 4, "UnitData", 128)
                           .Build();
+    auto clientUnitsLayout = GE::Layout::MakeConsecutive()
+                                 ->SetTotalSize(sizeof(Raw::ClientUnits))
+                                 .AddPointerOffsets(0x0u + 0 * 128 * 4, "UnitData", 128)
+                                 .AddPointerOffsets(0x0u + 1 * 128 * 4, "UnitData", 128)
+                                 .AddPointerOffsets(0x0u + 3 * 128 * 4, "UnitData", 128)
+                                 .Build();
     auto inventoryLayout = GE::Layout::MakeConsecutive()->SetTotalSize(sizeof(Raw::Inventory)).Build();
     auto itemLayout = GE::Layout::MakeConsecutive()->SetTotalSize(sizeof(Raw::ItemData)).Build();
     auto monsterLayout =
@@ -94,6 +90,7 @@ void RegisterLayouts(GE::MemoryProcessor& aMemoryProcessor)
     aMemoryProcessor.RegisterLayout("Base", std::move(baseLayout));
     aMemoryProcessor.RegisterLayout("DynamicPath", std::move(dynPathLayout));
     aMemoryProcessor.RegisterLayout("Game", std::move(gameLayout));
+    aMemoryProcessor.RegisterLayout("ClientUnits", std::move(clientUnitsLayout));
     aMemoryProcessor.RegisterLayout("Inventory", std::move(inventoryLayout));
     aMemoryProcessor.RegisterLayout("ItemData", std::move(itemLayout));
     aMemoryProcessor.RegisterLayout("MonsterData", std::move(monsterLayout));
@@ -127,7 +124,7 @@ std::string ToString(const GE::ConditionType aType)
     return "Unknown";
 }
 
-void PrintAchievement(const TestAchi& aAchievement)
+void PrintAchievement(const D2::D2Achi& aAchievement)
 {
     std::cout << "--- " << aAchievement->GetMetadata() << " ---" << std::endl;
     for (uint32_t i = 0; i < static_cast<uint32_t>(GE::ConditionType::All); ++i)
@@ -144,7 +141,7 @@ void PrintAchievement(const TestAchi& aAchievement)
     }
 }
 
-void PrintAchievements(const std::vector<TestAchi>& aAchievements)
+void PrintAchievements(const std::vector<D2::D2Achi>& aAchievements)
 {
     for (const auto& a : aAchievements)
     {
@@ -178,28 +175,36 @@ TEST_F(GE_Tests, Test)
     baseCallbacks.m_baseLocator = [](PMA::MemoryAccessPtr aMemoryAccess, const std::optional<PMA::MemoryAddress>&) {
         return aMemoryAccess->GetBaseAddress("D2Client.dll");
     };
-    GE::MainLayoutCallbacks gameUtilsCallbacks;
-    gameUtilsCallbacks.m_baseLocator = [](PMA::MemoryAccessPtr aMemoryAccess, const std::optional<PMA::MemoryAddress>&) {
-        return aMemoryAccess->GetBaseAddress("D2Client.dll");
-    };
     baseCallbacks.m_enabler = [](const GE::DataAccessor& aDataAccess, GE::Enabler& aEnabler) {
         auto baseLayout = aDataAccess.Get<ScatteredLayout>("Base");
         if (*baseLayout->m_inGame)
         {
             aEnabler.Enable("Game");
             aEnabler.Enable("GameUtils");
+            aEnabler.Enable("ClientUnits");
         }
         else
         {
             aEnabler.Disable("Game");
             aEnabler.Disable("GameUtils");
+            aEnabler.Disable("ClientUnits");
         }
+    };
+
+    GE::MainLayoutCallbacks gameUtilsCallbacks;
+    gameUtilsCallbacks.m_baseLocator = [](PMA::MemoryAccessPtr aMemoryAccess, const std::optional<PMA::MemoryAddress>&) {
+        return aMemoryAccess->GetBaseAddress("D2Client.dll");
+    };
+
+    GE::MainLayoutCallbacks clientUnitsCallbacks;
+    clientUnitsCallbacks.m_baseLocator = [](PMA::MemoryAccessPtr aMemoryAccess, const std::optional<PMA::MemoryAddress>&) {
+        return aMemoryAccess->GetBaseAddress("D2Client.dll") + 0x10A608;
     };
 
     GE::MainLayoutCallbacks inGameCallbacks;
     inGameCallbacks.m_baseLocator = [](PMA::MemoryAccessPtr aMemoryAccess, const std::optional<PMA::MemoryAddress>&) {
         size_t address = 0;
-        EXPECT_NO_THROW(aMemoryAccess->Read("D2Client.dll", 0x12236C, PMA::mem_cast(address), sizeof(size_t)));
+        aMemoryAccess->Read("D2Client.dll", 0x12236C, PMA::mem_cast(address), sizeof(size_t));
         return address;
     };
     inGameCallbacks.m_onReady = [&](std::shared_ptr<GE::DataAccessor> aDataAccess) {
@@ -214,23 +219,28 @@ TEST_F(GE_Tests, Test)
     memoryProcessor->AddMainLayout("Base", baseCallbacks);
     memoryProcessor->AddMainLayout("Game", inGameCallbacks);
     memoryProcessor->AddMainLayout("GameUtils", gameUtilsCallbacks);
+    memoryProcessor->AddMainLayout("ClientUnits", clientUnitsCallbacks);
 
     std::cout << "Creating achievements" << std::endl;
     auto achis = D2::CreateAchievements();
 
-    memoryProcessor->SetUpdateCallback([&](const GE::DataAccessor& aTmp) {
+    memoryProcessor->SetUpdateCallback([&](const GE::DataAccessor&) {
         if (!dataAccess || !sharedData)
         {
             return;
         }
-        std::cout << to_string(*aTmp.Get<GameUtilsLayout>("GameUtils")->m_zone) << std::endl;
         dataAccess->AdvanceFrame();
         sharedData->Update();
+        std::cout << to_string(dataAccess->GetMisc().GetZone()) << std::endl;
         for (auto& a : achis)
         {
             a->Update(*dataAccess, *sharedData);
         }
-        PrintAchievements(achis);
+        // PrintAchievements(achis);
+        //for (const auto& m : dataAccess->GetMonsters().GetAlive())
+        //{
+        //    std::cout << m->m_id << ": " << m->m_name << std::endl;
+        //}
         if (std::all_of(achis.begin(), achis.end(), [&memoryProcessor](const auto& a) {
                 return a->GetStatus() == GE::Status::Completed || a->GetStatus() == GE::Status::Failed;
             }))
