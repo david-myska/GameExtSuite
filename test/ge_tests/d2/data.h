@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <memory>
 #include <optional>
 #include <set>
@@ -86,8 +87,8 @@ namespace D2::Data
 
     struct Position
     {
-        const uint16_t x;
-        const uint16_t y;
+        uint16_t x;
+        uint16_t y;
     };
 
     struct Unit
@@ -618,6 +619,20 @@ namespace D2::Data
             m_deadMonsters = m_dataAccess->GetMonsters().GetDead() & m_dataAccess->GetMonsters(1).GetAlive();
             m_outMonsters = m_dataAccess->GetMonsters(1).GetAlive() - m_dataAccess->GetMonsters().GetAlive();
         }
+
+        const std::map<GUID, const Item*>& GetDroppedItems() const { return m_droppedItems; }
+
+        const std::map<GUID, const Item*>& GetPickedItems() const { return m_pickedItems; }
+
+        const std::map<GUID, const Item*>& GetEquippedItems() const { return m_equippedItems; }
+
+        const std::map<GUID, const Item*>& GetUnequippedItems() const { return m_unequippedItems; }
+
+        const std::map<GUID, const Monster*>& GetNewMonsters() const { return m_newMonsters; }
+
+        const std::map<GUID, const Monster*>& GetDeadMonsters() const { return m_deadMonsters; }
+
+        const std::map<GUID, const Monster*>& GetOutMonsters() const { return m_outMonsters; }
 
     private:
         std::shared_ptr<DataAccess> m_dataAccess;

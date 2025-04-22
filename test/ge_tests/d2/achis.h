@@ -2,65 +2,29 @@
 
 #include "data.h"
 
-#include "game_enhancer/achis/achievement.h"
+#include "achievements/act1/andariel_no_hit.h"
+#include "achievements/act1/andariel_no_leave.h"
+#include "achievements/act1/blood_raven_walk_distance.h"
+#include "achievements/act1/countess_gold_steal.h"
+#include "achievements/act1/leoric_last.h"
+#include "achievements/act1/smith_high_health.h"
+#include "achievements/act1/speedrun.h"
+#include "achievements/act1/tristram_clear.h"
+#include "achievements/base.h"
 
 namespace D2
 {
-    template <typename CustomData = GE::None>
-    using BLD = GE::AchievementBuilder<std::string, CustomData, Data::SharedData, Data::DataAccess>;
-
-    using D2Achi = std::unique_ptr<GE::Achievement<std::string, Data::SharedData, Data::DataAccess>>;
-
     struct ClearTristramCD
     {
     };
 
     std::vector<D2Achi> CreateAchievements()
     {
-        std::vector<D2Achi> achis;
-        achis.push_back(
-            BLD<ClearTristramCD>("ClearTristram")
-                .Add(GE::ConditionType::Precondition, "In Tristram",
-                     [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, ClearTristramCD& aCustom) {
-                         return aDataAccess.GetMisc().GetZone() == Data::Zone::Act1_Tristram;
-                     })
-                .Add(GE::ConditionType::Activator, "Enter Tristram",
-                     [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, ClearTristramCD& aCustom) {
-                         return true;
-                     })
-                .Add(GE::ConditionType::Completer, "Kill all monsters in Tristram",
-                     [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, ClearTristramCD& aCustom) {
-                         // TODO store seen monsters in custom data, when all dead, check that we have at least 100
-                         return false;
-                     })
-                .Build());
-        achis.push_back(
-            BLD<uint32_t>("ALPHA_2")
-                .Add(GE::ConditionType::Precondition, "Pre_1",
-                     [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
-                         return true;
-                     })
-                .Add(GE::ConditionType::Activator, "Activ_1",
-                     [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
-                         return true;
-                     })
-                .OnPass(GE::ConditionType::Activator,
-                        [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
-                            aCustom = aDataAccess.GetCurrentGameFrame();
-                        })
-                .Add(GE::ConditionType::Completer, "Comp_1",
-                     [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
-                         return false;
-                     })
-                .Add(GE::ConditionType::Failer, "Fail_1",
-                     [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
-                         return aDataAccess.GetCurrentGameFrame() > aCustom + 25 * 5;
-                     })
-                .Add(GE::ConditionType::Reseter, "Reset_1",
-                     [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aShared, uint32_t& aCustom) {
-                         return aDataAccess.GetCurrentGameFrame() > aCustom + 25 * 10;
-                     })
-                .Build());
-        return achis;
+        std::vector<D2Achi> result;
+
+        // Act1
+        result.push_back(D2::Achi::TristramClear::Create());
+
+        return result;
     }
 }

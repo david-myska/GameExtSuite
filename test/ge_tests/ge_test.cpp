@@ -236,11 +236,7 @@ TEST_F(GE_Tests, Test)
         {
             a->Update(*dataAccess, *sharedData);
         }
-        // PrintAchievements(achis);
-        //for (const auto& m : dataAccess->GetMonsters().GetAlive())
-        //{
-        //    std::cout << m->m_id << ": " << m->m_name << std::endl;
-        //}
+        PrintAchievements(achis);
         if (std::all_of(achis.begin(), achis.end(), [&memoryProcessor](const auto& a) {
                 return a->GetStatus() == GE::Status::Completed || a->GetStatus() == GE::Status::Failed;
             }))
