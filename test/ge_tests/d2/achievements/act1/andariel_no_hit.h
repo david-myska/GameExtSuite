@@ -6,7 +6,7 @@ namespace D2::Achi::AndarielNoHit
 {
     struct CD
     {
-        std::optional<Data::GUID> m_andy;
+        Data::GUID m_andy = 0;
     };
 
     auto Create()
@@ -16,7 +16,7 @@ namespace D2::Achi::AndarielNoHit
                  [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
                      return aDataAccess.GetMisc().GetZone() == Data::Zone::Act1_CatacombsLevel4;
                  })
-            .Add(GE::ConditionType::Activator, "Enter Catacombs Level 4",
+            .Add(GE::ConditionType::Activator, "Meet Andariel",
                  [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
                      auto andys = aDataAccess.GetMonsters().GetByName("ANDARIEL");
                      if (andys.empty())
@@ -28,7 +28,7 @@ namespace D2::Achi::AndarielNoHit
                  })
             .Add(GE::ConditionType::Completer, "Kill Andariel",
                  [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
-                     return aS.GetDeadMonsters().contains(*aC.m_andy);
+                     return aS.GetDeadMonsters().contains(aC.m_andy);
                  })
             .Add(GE::ConditionType::Failer, "Don't get hit",
                  [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
