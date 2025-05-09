@@ -4,26 +4,37 @@
 
 namespace D2::Achi::AndarielNoHit
 {
-    struct TestPersistanceData : GE::PersistentData
+    struct CD
     {
-        uint32_t killed = 0;
-
-        void Serialize(std::ostream& aOut) const override { aOut << killed; }
-
-        void Deserialize(std::istream& aIn) override { aIn >> killed; }
+        std::optional<Data::GUID> m_andy;
     };
 
     auto Create()
     {
-        return BLD<TestPersistanceData>("TestPersistance")
-            .Add(GE::ConditionType::Activator, "",
-                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, TestPersistanceData& aC) {
+        return BLD<CD>("Andariel no hit")
+            .Add(GE::ConditionType::Precondition, "In Catacombs Level 4",
+                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
+                     return aDataAccess.GetMisc().GetZone() == Data::Zone::Act1_CatacombsLevel4;
+                 })
+            .Add(GE::ConditionType::Activator, "Enter Catacombs Level 4",
+                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
+                     auto andys = aDataAccess.GetMonsters().GetByName("ANDARIEL");
+                     if (andys.empty())
+                     {
+                         return false;
+                     }
+                     aC.m_andy = andys.begin()->first;
                      return true;
                  })
-            .Add(GE::ConditionType::Completer, "Kill 200 monsters",
-                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, TestPersistanceData& aC) {
-                     aC.killed += aS.GetDeadMonsters().size();
-                     return aC.killed >= 200;
+            .Add(GE::ConditionType::Completer, "Kill Andariel",
+                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
+                     return aS.GetDeadMonsters().contains(*aC.m_andy);
+                 })
+            .Add(GE::ConditionType::Failer, "Don't get hit",
+                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
+                     auto currentLife = aDataAccess.GetPlayers().GetLocal()->m_stats.GetValue(Data::StatType::Life);
+                     auto previousLife = aDataAccess.GetPlayers(1).GetLocal()->m_stats.GetValue(Data::StatType::Life);
+                     return currentLife < previousLife;
                  })
             .Build();
     }
