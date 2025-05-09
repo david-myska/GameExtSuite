@@ -14,6 +14,12 @@ namespace GE
         Failed,
     };
 
+    struct PersistentData
+    {
+        virtual void Serialize(std::ostream& aOut) const = 0;
+        virtual void Deserialize(std::istream& aIn) = 0;
+    };
+
     struct None
     {
     };
@@ -21,20 +27,28 @@ namespace GE
     template <typename Metadata, typename SharedData, typename DataAccess = GE::DataAccessor>
     struct Achievement
     {
+        using _Metadata = Metadata;
+        using _SharedData = SharedData;
+        using _DataAccess = DataAccess;
+
         virtual ~Achievement() = default;
 
-        virtual void Update(const DataAccess& aDataAccess, const SharedData& aSharedData) = 0;
         virtual Status GetStatus() const = 0;
 
+        virtual void Update(const DataAccess& aDataAccess, const SharedData& aSharedData) = 0;
+
         /*
-         * Custom data can be used to store name, description, difficulty, reward, ...
+         * Metadata can be used to store name, description, difficulty, reward, ...
          * Just any static data that you might want to display.
          */
         virtual const Metadata& GetMetadata() const = 0;
 
         virtual const std::vector<bool>& GetConditionResults(ConditionType aConditionType) const = 0;
-
         virtual const std::vector<std::string>& GetConditionNames(ConditionType aConditionType) const = 0;
+        // virtual const std::vector<std::string>& GetConditionProgress(ConditionType aConditionType) const = 0;
+
+        virtual void Serialize(std::ostream& aOut) const = 0;
+        virtual void Deserialize(std::istream& aIn) = 0;
     };
 
     namespace details
@@ -49,7 +63,6 @@ namespace GE
                 std::function<void(const DataAccess&, const SharedData&, CustomData&)> m_onPassCallback;
             };
 
-            const size_t m_id = 0;
             Status m_status = Status::Inactive;
             const Metadata m_metadata;
             Conditions<const DataAccess&, const SharedData&, CustomData&> m_conditions;
@@ -142,14 +155,13 @@ namespace GE
 
         public:
             AchievementImpl(
-                size_t aId, Metadata aMetadata,
+                Metadata aMetadata,
                 std::unordered_map<ConditionType, std::vector<Condition<const DataAccess&, const SharedData&, CustomData&>>>
                     aConditions,
                 std::unordered_map<ConditionType, std::vector<std::string>> aNames,
                 std::unordered_map<ConditionType, std::function<void(const DataAccess&, const SharedData&, CustomData&)>>
                     aOnPassCallbacks = {})
-                : m_id(aId)
-                , m_metadata(std::move(aMetadata))
+                : m_metadata(std::move(aMetadata))
                 , m_conditions(std::move(aConditions))
             {
                 for (uint32_t conditionType = 0; conditionType < static_cast<uint32_t>(ConditionType::All); ++conditionType)
@@ -213,13 +225,27 @@ namespace GE
             {
                 return m_cachedConditions.at(aConditionType).m_names;
             }
-        };
 
-        size_t GetNextId()
-        {
-            static size_t s_id = 0;
-            return ++s_id;
-        }
+            void Serialize(std::ostream& aOut) const override
+            {
+                aOut << (m_status == Status::Completed);
+                if constexpr (std::is_base_of_v<PersistentData, CustomData>)
+                {
+                    m_customData.Serialize(aOut);
+                }
+            }
+
+            void Deserialize(std::istream& aIn) override
+            {
+                bool completed = false;
+                aIn >> completed;
+                m_status = completed ? Status::Completed : Status::Inactive;
+                if constexpr (std::is_base_of_v<PersistentData, CustomData>)
+                {
+                    m_customData.Deserialize(aIn);
+                }
+            }
+        };
     }
 
     template <typename Metadata = None, typename CustomData = None, typename SharedData = None,
@@ -248,8 +274,7 @@ namespace GE
                 throw std::runtime_error("Every achievement needs at least 1 Activator and 1 Completer!");
             }
             return std::make_unique<details::AchievementImpl<Metadata, CustomData, SharedData, DataAccess>>(
-                details::GetNextId(), std::move(m_metadata), std::move(m_conditions), std::move(m_names),
-                std::move(m_onPassCallbacks));
+                std::move(m_metadata), std::move(m_conditions), std::move(m_names), std::move(m_onPassCallbacks));
         }
 
         AchievementBuilder& Add(ConditionType aConditionType, std::string aDescription,

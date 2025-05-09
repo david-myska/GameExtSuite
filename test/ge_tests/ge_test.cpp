@@ -4,6 +4,7 @@
 
 #include "d2/achis.h"
 #include "game_enhancer/achis/achievement.h"
+#include "game_enhancer/achis/achievement_manager.h"
 #include "game_enhancer/impl/layout/frame_memory_storage.h"
 #include "game_enhancer/memory_layout_builder.h"
 #include "game_enhancer/memory_processor.h"
@@ -124,9 +125,9 @@ std::string ToString(const GE::ConditionType aType)
     return "Unknown";
 }
 
-void PrintAchievement(const D2::D2Achi& aAchievement)
+void PrintAchievement(uint32_t aId, const D2::D2Achi& aAchievement)
 {
-    std::cout << "--- " << aAchievement->GetMetadata() << " ---" << std::endl;
+    std::cout << "--- " << aId << " " << aAchievement->GetMetadata() << " ---" << std::endl;
     for (uint32_t i = 0; i < static_cast<uint32_t>(GE::ConditionType::All); ++i)
     {
         auto cType = static_cast<GE::ConditionType>(i);
@@ -141,11 +142,11 @@ void PrintAchievement(const D2::D2Achi& aAchievement)
     }
 }
 
-void PrintAchievements(const std::vector<D2::D2Achi>& aAchievements)
+void PrintAchievements(const std::map<uint32_t, D2::D2Achi>& aAchievements)
 {
     for (const auto& a : aAchievements)
     {
-        PrintAchievement(a);
+        PrintAchievement(a.first, a.second);
         std::cout << "\n-----\n" << std::endl;
     }
 }
@@ -222,7 +223,7 @@ TEST_F(GE_Tests, Test)
     memoryProcessor->AddMainLayout("ClientUnits", clientUnitsCallbacks);
 
     std::cout << "Creating achievements" << std::endl;
-    auto achis = D2::CreateAchievements();
+    GE::AchievementManager<D2::D2Achi::element_type> achiManager(D2::CreateAchievements);
 
     memoryProcessor->SetUpdateCallback([&](const GE::DataAccessor&) {
         if (!dataAccess || !sharedData)
@@ -232,13 +233,10 @@ TEST_F(GE_Tests, Test)
         dataAccess->AdvanceFrame();
         sharedData->Update();
         std::cout << to_string(dataAccess->GetMisc().GetZone()) << std::endl;
-        for (auto& a : achis)
-        {
-            a->Update(*dataAccess, *sharedData);
-        }
-        PrintAchievements(achis);
-        if (std::all_of(achis.begin(), achis.end(), [&memoryProcessor](const auto& a) {
-                return a->GetStatus() == GE::Status::Completed || a->GetStatus() == GE::Status::Failed;
+        achiManager.Update(*dataAccess, *sharedData);
+        PrintAchievements(achiManager.GetActiveAchievements());
+        if (std::ranges::all_of(achiManager.GetActiveAchievements(), [&memoryProcessor](const auto& p) {
+                return p.second->GetStatus() == GE::Status::Completed || p.second->GetStatus() == GE::Status::Failed;
             }))
         {
             std::cout << "All achievements completed" << std::endl;

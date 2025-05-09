@@ -14,16 +14,13 @@
 
 namespace D2
 {
-    struct ClearTristramCD
+    std::map<uint32_t, D2Achi> CreateAchievements()
     {
-    };
-
-    std::vector<D2Achi> CreateAchievements()
-    {
-        std::vector<D2Achi> result;
+        std::map<uint32_t, D2Achi> result;
 
         // Act1
-        result.push_back(D2::Achi::TristramClear::Create());
+        result.emplace(1, D2::Achi::TristramClear::Create());
+        result.emplace(2, D2::Achi::AndarielNoHit::Create());// just testing
 
         return result;
     }

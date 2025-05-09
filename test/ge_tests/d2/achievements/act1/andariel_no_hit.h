@@ -4,24 +4,26 @@
 
 namespace D2::Achi::AndarielNoHit
 {
-    struct CD
+    struct TestPersistanceData : GE::PersistentData
     {
+        uint32_t killed = 0;
+
+        void Serialize(std::ostream& aOut) const override { aOut << killed; }
+
+        void Deserialize(std::istream& aIn) override { aIn >> killed; }
     };
 
     auto Create()
     {
-        return BLD<CD>("ClearTristram")
-            .Add(GE::ConditionType::Precondition, "In Tristram",
-                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
-                     return aDataAccess.GetMisc().GetZone() == Data::Zone::Act1_Tristram;
-                 })
-            .Add(GE::ConditionType::Activator, "Enter Tristram",
-                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
+        return BLD<TestPersistanceData>("TestPersistance")
+            .Add(GE::ConditionType::Activator, "",
+                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, TestPersistanceData& aC) {
                      return true;
                  })
-            .Add(GE::ConditionType::Completer, "Kill all monsters in Tristram",
-                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
-                     return false;
+            .Add(GE::ConditionType::Completer, "Kill 200 monsters",
+                 [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, TestPersistanceData& aC) {
+                     aC.killed += aS.GetDeadMonsters().size();
+                     return aC.killed >= 200;
                  })
             .Build();
     }
