@@ -60,12 +60,6 @@ namespace GE
          */
         Activator,
         /*
-         * All invariants need to evaluate to true on each update.
-         * If not, the achievement is marked as Failed.
-         * Invariants are just a special case of failers.
-         */
-        Invariant,
-        /*
          * When all completers evaluate to true at the same time, the achievemnt is marked as Completed.
          */
         Completer,
@@ -73,6 +67,10 @@ namespace GE
          * Any failer evaluating to true causes the achievement to be marked as Failed.
          */
         Failer,
+        /*
+         * Deciders are run after all Completers pass. All Deciders need to evaluate to true.
+         */
+        Decider,
         /*
          * When all reseters evaluate to true, achievement can change status from Failed to Inactive.
          */

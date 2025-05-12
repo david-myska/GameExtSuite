@@ -23,6 +23,8 @@ namespace D2
         // Act1
         result.emplace(1, D2::Achi::TristramClear::Create());
         result.emplace(2, D2::Achi::AndarielNoHit::Create());
+        result.emplace(3, D2::Achi::AndarielNoLeave::Create());
+        result.emplace(4, D2::Achi::BloodRavenWalkDistance::Create());
 
         return result;
     }

@@ -6,25 +6,19 @@ namespace D2::Achi::AndarielNoLeave
 {
     struct CD
     {
-        Data::GUID m_andy = 0;
+        Data::GUID m_andarielId = 0;
     };
 
     auto Create()
     {
-        return BLD<CD>("Andariel no hit")
+        return BLD<CD>("Andariel no leave")
             .Add(GE::ConditionType::Precondition, "In Catacombs Level 4",
                  [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
                      return aDataAccess.GetMisc().GetZone() == Data::Zone::Act1_CatacombsLevel4;
                  })
             .Add(GE::ConditionType::Activator, "Meet Andariel",
                  [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
-                     auto andys = aDataAccess.GetMonsters().GetByName("ANDARIEL");
-                     if (andys.empty())
-                     {
-                         return false;
-                     }
-                     aC.m_andy = andys.begin()->first;
-                     return true;
+                     return MonsterNearby("ANDARIEL", aDataAccess, aC.m_andarielId);
                  })
             .Add(GE::ConditionType::Activator, "Enter Andariel's room",
                  [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
@@ -34,7 +28,7 @@ namespace D2::Achi::AndarielNoLeave
                     })
             .Add(GE::ConditionType::Completer, "Kill Andariel",
                  [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {
-                     return aS.GetDeadMonsters().contains(aC.m_andy);
+                     return aS.GetDeadMonsters().contains(aC.m_andarielId);
                  })
             .Add(GE::ConditionType::Failer, "Stay in the room",
                  [](const D2::Data::DataAccess& aDataAccess, const D2::Data::SharedData& aS, CD& aC) {

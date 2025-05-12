@@ -13,4 +13,13 @@ namespace D2
 
     using D2Achi = std::unique_ptr<GE::Achievement<std::string, Data::SharedData, Data::DataAccess>>;
 
+    bool MonsterNearby(const std::string& aName, const D2::Data::DataAccess& aDataAccess, Data::GUID& aGuid) {
+        auto mons = aDataAccess.GetMonsters().GetByName(aName);
+        if (mons.empty())
+        {
+            return false;
+        }
+        aGuid = mons.begin()->first;
+        return true;
+    }
 }
