@@ -50,33 +50,47 @@ namespace GE
     enum class ConditionType
     {
         /*
-         * All preconditions need to be met before activators start trying.
-         * Commonly used to filter achievements according to very general requirements.
-         * Level, location, story progress...
+         * Preconditions must evaluate to true **every time** before any other conditions are processed.
+         * If a Precondition fails, no other conditions will be evaluated.
+         * Commonly used to filter achievements based on broad requirements such as
+         * level, location, story progress, etc.
          */
         Precondition,
+
         /*
-         * All activators need to evaluate to true at the same time to activate the achievement.
+         * All Activators must evaluate to true **simultaneously** for the achievement to activate.
          */
         Activator,
+
         /*
-         * When all completers evaluate to true at the same time, the achievemnt is marked as Completed.
+         * All Completers must evaluate to true **simultaneously**.
+         * Once all Completers pass, Validators are triggered.
          */
         Completer,
+
         /*
-         * Any failer evaluating to true causes the achievement to be marked as Failed.
+         * If any Failer evaluates to true, the achievement is immediately marked as Failed.
          */
         Failer,
+
         /*
-         * Deciders are run after all Completers pass. All Deciders need to evaluate to true.
+         * Validators are evaluated **only once** after all Completers have successfully passed.
+         * If any Validator fails, the achievement is marked as **Failed**.
+         * If all Validators succeed, the achievement is marked as **Completed**.
+         * Validators provide a final check to ensure specific success conditions are met.
+         *
+         * (Validators are run every frame, the same as Completers and Failers.
+         *  However; their outcome is ignored until Completers pass.)
          */
-        Decider,
+        Validator,
+
         /*
-         * When all reseters evaluate to true, achievement can change status from Failed to Inactive.
+         * All Reseters must evaluate to true **simultaneously** for a previously Failed achievement to revert to Inactive.
          */
         Reseter,
+
         /*
-         * Helper value that allows to iterate over the enum.
+         * A helper value allowing iteration over all condition types.
          */
         All
     };

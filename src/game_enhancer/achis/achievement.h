@@ -85,8 +85,8 @@ namespace GE
                 else if (m_status == Status::Active)
                 {
                     ResetConditionResults(m_cachedConditions[ConditionType::Failer]);
-                    ResetConditionResults(m_cachedConditions[ConditionType::Invariant]);
                     ResetConditionResults(m_cachedConditions[ConditionType::Completer]);
+                    ResetConditionResults(m_cachedConditions[ConditionType::Validator]);
                 }
                 else if (m_status == Status::Failed)
                 {
@@ -113,28 +113,36 @@ namespace GE
             void ProcessActive(const DataAccess& aDataAccess, const SharedData& aSharedData)
             {
                 auto& completersCached = m_cachedConditions[ConditionType::Completer];
-                auto& invariantsCached = m_cachedConditions[ConditionType::Invariant];
+                auto& validatorsCached = m_cachedConditions[ConditionType::Validator];
                 auto& failersCached = m_cachedConditions[ConditionType::Failer];
                 completersCached.m_results = m_conditions.Evaluate(ConditionType::Completer, aDataAccess, aSharedData,
                                                                    m_customData);
-                invariantsCached.m_results = m_conditions.Evaluate(ConditionType::Invariant, aDataAccess, aSharedData,
+                validatorsCached.m_results = m_conditions.Evaluate(ConditionType::Validator, aDataAccess, aSharedData,
                                                                    m_customData);
                 failersCached.m_results = m_conditions.Evaluate(ConditionType::Failer, aDataAccess, aSharedData, m_customData);
+
+                std::function<void(const DataAccess&, const SharedData&, CustomData&)>* passCallback = nullptr;
+
                 if (EvaluateAnd(completersCached.m_results))
                 {
-                    m_status = Status::Completed;
-                    if (completersCached.m_onPassCallback)
+                    m_status = EvaluateAnd(validatorsCached.m_results) ? Status::Completed : Status::Failed;
+                    if (m_status == Status::Completed && completersCached.m_onPassCallback)
                     {
-                        completersCached.m_onPassCallback(aDataAccess, aSharedData, m_customData);
+                        passCallback = &completersCached.m_onPassCallback;
                     }
                 }
-                else if (!EvaluateAnd(invariantsCached.m_results) || EvaluateOr(failersCached.m_results))
+                if (m_status == Status::Failed || EvaluateOr(failersCached.m_results))
                 {
                     m_status = Status::Failed;
                     if (failersCached.m_onPassCallback)
                     {
-                        failersCached.m_onPassCallback(aDataAccess, aSharedData, m_customData);
+                        passCallback = &failersCached.m_onPassCallback;
                     }
+                }
+
+                if (passCallback)
+                {
+                    (*passCallback)(aDataAccess, aSharedData, m_customData);
                 }
             }
 
@@ -296,9 +304,9 @@ namespace GE
         AchievementBuilder& OnPass(ConditionType aConditionType,
                                    const std::function<void(const DataAccess&, const SharedData&, CustomData&)>& aCallback)
         {
-            if (aConditionType == ConditionType::Precondition || aConditionType == ConditionType::Invariant)
+            if (aConditionType == ConditionType::Precondition || aConditionType == ConditionType::Validator)
             {
-                throw std::runtime_error("Precondition and Invariant cannot have a pass callback");
+                throw std::runtime_error("Precondition and Validator cannot have a pass callback");
             }
             m_onPassCallbacks[aConditionType] = aCallback;
             return *this;

@@ -111,12 +111,12 @@ std::string ToString(const GE::ConditionType aType)
         return "Precondition";
     case GE::ConditionType::Activator:
         return "Activator";
-    case GE::ConditionType::Invariant:
-        return "Invariant";
     case GE::ConditionType::Completer:
         return "Completer";
     case GE::ConditionType::Failer:
         return "Failer";
+    case GE::ConditionType::Validator:
+        return "Validator";
     case GE::ConditionType::Reseter:
         return "Reseter";
     default:
