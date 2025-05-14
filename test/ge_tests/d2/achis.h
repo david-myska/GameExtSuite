@@ -25,6 +25,8 @@ namespace D2
         result.emplace(2, D2::Achi::AndarielNoHit::Create());
         result.emplace(3, D2::Achi::AndarielNoLeave::Create());
         result.emplace(4, D2::Achi::BloodRavenWalkDistance::Create());
+        // result.emplace(5, D2::Achi::CountessGoldSteal::Create());
+        result.emplace(6, D2::Achi::LeoricLast::Create());
 
         return result;
     }
