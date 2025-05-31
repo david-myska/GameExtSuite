@@ -255,7 +255,12 @@ namespace GE
         {
             throw std::runtime_error("No update callback set!");
         }
-        m_onAttachedToken = m_autoAttach->OnAttached([this] {
+        m_onAttachedToken = m_targetProcess->OnAttachmentChanged([this](bool aAttached) {
+            if (!aAttached)
+            {
+                RequestStop();
+                return;
+            }
             m_memoryAccess = m_targetProcess->GetMemoryAccess();
             m_updateThread = std::jthread([this](std::stop_token aStopToken) {
                 m_running = true;
