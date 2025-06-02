@@ -13,6 +13,7 @@ set(SOURCE_FILES
 				"game_enhancer/impl/data_accessor.cpp"
 				"game_enhancer/impl/layout/memory_layout_builder.cpp"
 				"game_enhancer/impl/layout/frame_memory_storage.cpp"
+				"game_enhancer/impl/achis/conditions.cpp"
 )
 
 set(HEADER_FILES
