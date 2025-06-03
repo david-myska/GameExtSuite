@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <vector>
 
 #include "game_enhancer/data_accessor.h"
@@ -93,6 +94,8 @@ namespace GE
         All
     };
 
+    std::string to_string(ConditionType aConditionType);
+    
     template <typename... CallableArgs>
     std::vector<bool> EvaluateEach(const std::vector<Condition<CallableArgs...>>& aConditions, CallableArgs&&... aArgs)
     {
