@@ -1,9 +1,12 @@
 #pragma once
 
 #include <iostream>
+#include <unordered_set>
+#include <variant>
 
 #include "game_enhancer/achis/conditions.h"
 #include "game_enhancer/data_accessor.h"
+#include "pma/impl/callback/callback.h"
 
 namespace GE
 {
@@ -14,12 +17,168 @@ namespace GE
         Active,
         Completed,
         Failed,
+        All,
     };
 
     struct PersistentData
     {
         virtual void Serialize(std::ostream& aOut) const = 0;
         virtual void Deserialize(std::istream& aIn) = 0;
+    };
+
+    struct ProgressTracker;
+
+    class BaseProgressData
+    {
+        std::unordered_set<ProgressTracker*> m_modifiedTrackers;
+
+    public:
+        virtual ~BaseProgressData() = default;
+
+        void AddModifiedTracker(ProgressTracker* aTracker) { m_modifiedTrackers.insert(aTracker); }
+
+        std::unordered_set<ProgressTracker*> ExtractModifiedTrackers()
+        {
+            decltype(m_modifiedTrackers) result;
+            std::swap(m_modifiedTrackers, result);
+            return result;
+        }
+    };
+
+    struct ProgressTracker
+    {
+        virtual ~ProgressTracker() = default;
+
+        virtual bool IsCompleted() const = 0;
+
+        virtual std::string GetMessage() const { return m_staticMessage; }
+
+        uint32_t GetId() const { return m_id; }
+
+    protected:
+        static uint32_t GetUniqueId()
+        {
+            static std::atomic_uint32_t id = 0;
+            return ++id;
+        }
+
+        ProgressTracker(BaseProgressData* aOwner, const std::string& aStaticMessage)
+            : m_owner(aOwner)
+            , m_staticMessage(aStaticMessage)
+        {
+            if (!m_owner)
+            {
+                throw std::runtime_error("ProgressTracker owner cannot be null");
+            }
+        }
+
+        BaseProgressData* m_owner;
+        std::string m_staticMessage;
+        uint32_t m_id = GetUniqueId();
+    };
+
+    template <typename T>
+    class ProgressTrackerT : public ProgressTracker
+    {
+        T m_target;
+        T m_current;
+
+    public:
+        ProgressTrackerT(BaseProgressData* aOwner, const std::string& aStaticMessage, T aTarget, T aCurrent = {})
+            : ProgressTracker(aOwner, aStaticMessage)
+            , m_target(aTarget)
+            , m_current(aCurrent)
+        {
+        }
+
+        bool IsCompleted() const override { return m_current == m_target; }
+
+        T GetTarget() const { return m_target; }
+
+        void SetTarget(T aTarget)
+        {
+            if (aTarget == m_target)
+            {
+                return;
+            }
+            m_target = aTarget;
+            m_owner->AddModifiedTracker(this);
+        }
+
+        T GetCurrent() const { return m_current; }
+
+        void SetCurrent(T aCurrent)
+        {
+            if (aCurrent == m_current)
+            {
+                return;
+            }
+            m_current = aCurrent;
+            m_owner->AddModifiedTracker(this);
+        }
+
+        // TODO add clamp between min and max (original and target)
+    };
+
+    template <typename T, typename Derived>
+    class AssignOps
+    {
+    public:
+        Derived& operator=(T v)
+        {
+            derived().SetCurrent(v);
+            return derived();
+        }
+
+    private:
+        Derived& derived() { return static_cast<Derived&>(*this); }
+    };
+
+    class ProgressTrackerBool : public ProgressTrackerT<bool>, public AssignOps<bool, ProgressTrackerBool>
+    {
+    public:
+        ProgressTrackerBool(BaseProgressData* aOwner, const std::string& aStaticMessage, bool aTarget)
+            : ProgressTrackerT(aOwner, aStaticMessage, aTarget, !aTarget)
+        {
+        }
+    };
+
+    template <typename T, typename Derived>
+    class ArithmeticOps
+    {
+    public:
+        Derived& operator+=(T v)
+        {
+            static_assert(std::is_arithmetic_v<T>);
+            derived().SetCurrent(derived().GetCurrent() + v);
+            return derived();
+        }
+
+        Derived& operator-=(T v)
+        {
+            static_assert(std::is_arithmetic_v<T>);
+            derived().SetCurrent(derived().GetCurrent() - v);
+            return derived();
+        }
+
+    private:
+        Derived& derived() { return static_cast<Derived&>(*this); }
+    };
+
+    class ProgressTrackerInt : public ProgressTrackerT<int>,
+                               public ArithmeticOps<int, ProgressTrackerInt>,
+                               public AssignOps<int, ProgressTrackerInt>
+    {
+    public:
+        using ProgressTrackerT::ProgressTrackerT;
+    };
+
+    class ProgressTrackerFloat : public ProgressTrackerT<float>,
+                                 public ArithmeticOps<float, ProgressTrackerFloat>,
+                                 public AssignOps<float, ProgressTrackerFloat>
+    {
+    public:
+        using ProgressTrackerT::ProgressTrackerT;
     };
 
     struct None
@@ -39,15 +198,18 @@ namespace GE
 
         virtual void Update(const DataAccess& aDataAccess, const SharedData& aSharedData) = 0;
 
+        virtual PMA::ScopedTokenPtr OnStatusChanged(const std::function<void(Status)>& aCallback) = 0;
+
+        virtual PMA::ScopedTokenPtr OnProgressMade(
+            const std::function<void(const std::unordered_set<ProgressTracker*>&)>& aCallback) = 0;
+
         /*
          * Metadata can be used to store name, description, difficulty, reward, ...
          * Just any static data that you might want to display.
          */
         virtual const Metadata& GetMetadata() const = 0;
 
-        virtual const std::vector<bool>& GetConditionResults(ConditionType aConditionType) const = 0;
-        virtual const std::vector<std::string>& GetConditionNames(ConditionType aConditionType) const = 0;
-        // virtual const std::vector<std::string>& GetConditionProgress(ConditionType aConditionType) const = 0;
+        virtual const std::unordered_set<ProgressTracker*>& GetProgress(ConditionType aConditionType) const = 0;
 
         virtual void Serialize(std::ostream& aOut) const = 0;
         virtual void Deserialize(std::istream& aIn) = 0;
@@ -55,151 +217,133 @@ namespace GE
 
     namespace details
     {
-        template <typename Metadata, typename CustomData, typename SharedData, typename DataAccess = GE::DataAccessor>
+        template <typename Metadata, typename ProgressData, typename SharedData, typename DataAccess = GE::DataAccessor>
         class AchievementImpl : public Achievement<Metadata, SharedData, DataAccess>
         {
-            struct NamedConditions
-            {
-                std::vector<bool> m_results;
-                std::vector<std::string> m_names;
-                std::function<void(const DataAccess&, const SharedData&, CustomData&)> m_onPassCallback;
-            };
-
             Status m_status = Status::Inactive;
             const Metadata m_metadata;
-            Conditions<const DataAccess&, const SharedData&, CustomData&> m_conditions;
-            CustomData m_customData;
+            ProgressData m_progressData;
+            std::function<void(ProgressData&, std::unordered_map<ConditionType, std::unordered_set<ProgressTracker*>>&)>
+                m_conditionsSetup;
+            std::unordered_map<ConditionType, std::unordered_set<ProgressTracker*>> m_progressTrackers;
 
-            std::unordered_map<ConditionType, NamedConditions> m_cachedConditions;
+            std::vector<std::function<void(Status, const DataAccess&, const SharedData&, ProgressData&)>> m_updateCallbacks;
+            std::unordered_map<ConditionType, std::function<void(const DataAccess&, const SharedData&, ProgressData&)>>
+                m_onPassCallbacks;
 
-            void ResetConditionResults(NamedConditions& aConditions)
-            {
-                std::vector<bool>(aConditions.m_results.size(), false).swap(aConditions.m_results);
-            }
-
-            void ResetCaches()
-            {
-                if (m_status == Status::Inactive)
-                {
-                    ResetConditionResults(m_cachedConditions[ConditionType::Precondition]);
-                    ResetConditionResults(m_cachedConditions[ConditionType::Activator]);
-                }
-                else if (m_status == Status::Active)
-                {
-                    ResetConditionResults(m_cachedConditions[ConditionType::Failer]);
-                    ResetConditionResults(m_cachedConditions[ConditionType::Completer]);
-                    ResetConditionResults(m_cachedConditions[ConditionType::Validator]);
-                }
-                else if (m_status == Status::Failed)
-                {
-                    ResetConditionResults(m_cachedConditions[ConditionType::Reseter]);
-                }
-            }
+            PMA::Callback<Status> m_onStatusChangedCallback;
+            PMA::Callback<const std::unordered_set<ProgressTracker*>&> m_onProgressMadeCallback;
 
             void ProcessInactive(const DataAccess& aDataAccess, const SharedData& aSharedData)
             {
-                auto& activatorsCached = m_cachedConditions[ConditionType::Activator];
-                activatorsCached.m_results = m_conditions.Evaluate(ConditionType::Activator, aDataAccess, aSharedData,
-                                                                   m_customData);
-                if (!EvaluateAnd(activatorsCached.m_results))
+                if (std::ranges::any_of(m_progressTrackers[ConditionType::Activator], [](const ProgressTracker* tracker) {
+                        return !tracker->IsCompleted();
+                    }))
                 {
                     return;
                 }
-                m_status = Status::Active;
-                if (activatorsCached.m_onPassCallback)
-                {
-                    activatorsCached.m_onPassCallback(aDataAccess, aSharedData, m_customData);
-                }
+                SetStatus(Status::Active);
+                m_onPassCallbacks[ConditionType::Activator](aDataAccess, aSharedData, m_progressData);
             }
 
             void ProcessActive(const DataAccess& aDataAccess, const SharedData& aSharedData)
             {
-                auto& completersCached = m_cachedConditions[ConditionType::Completer];
-                auto& validatorsCached = m_cachedConditions[ConditionType::Validator];
-                auto& failersCached = m_cachedConditions[ConditionType::Failer];
-                completersCached.m_results = m_conditions.Evaluate(ConditionType::Completer, aDataAccess, aSharedData,
-                                                                   m_customData);
-                validatorsCached.m_results = m_conditions.Evaluate(ConditionType::Validator, aDataAccess, aSharedData,
-                                                                   m_customData);
-                failersCached.m_results = m_conditions.Evaluate(ConditionType::Failer, aDataAccess, aSharedData, m_customData);
+                std::function<void(const DataAccess&, const SharedData&, ProgressData&)>* passCallback = nullptr;
 
-                std::function<void(const DataAccess&, const SharedData&, CustomData&)>* passCallback = nullptr;
-
-                if (EvaluateAnd(completersCached.m_results))
+                if (std::ranges::all_of(m_progressTrackers[ConditionType::Completer], [](const ProgressTracker* tracker) {
+                        return tracker->IsCompleted();
+                    }))
                 {
-                    m_status = EvaluateAnd(validatorsCached.m_results) ? Status::Completed : Status::Failed;
-                    if (m_status == Status::Completed && completersCached.m_onPassCallback)
+                    bool validated = std::ranges::all_of(m_progressTrackers[ConditionType::Validator],
+                                                         [](const ProgressTracker* tracker) {
+                                                             return tracker->IsCompleted();
+                                                         });
+                    SetStatus(validated ? Status::Completed : Status::Failed);
+                    if (m_status == Status::Completed)
                     {
-                        passCallback = &completersCached.m_onPassCallback;
+                        passCallback = &m_onPassCallbacks[ConditionType::Completer];
                     }
                 }
-                if (m_status == Status::Failed || EvaluateOr(failersCached.m_results))
+                if (m_status == Status::Failed ||
+                    std::ranges::any_of(m_progressTrackers[ConditionType::Failer], [](const ProgressTracker* tracker) {
+                        return tracker->IsCompleted();
+                    }))
                 {
-                    m_status = Status::Failed;
-                    if (failersCached.m_onPassCallback)
-                    {
-                        passCallback = &failersCached.m_onPassCallback;
-                    }
+                    SetStatus(Status::Failed);
+                    passCallback = &m_onPassCallbacks[ConditionType::Failer];
                 }
 
                 if (passCallback)
                 {
-                    (*passCallback)(aDataAccess, aSharedData, m_customData);
+                    (*passCallback)(aDataAccess, aSharedData, m_progressData);
                 }
             }
 
             void ProcessFailed(const DataAccess& aDataAccess, const SharedData& aSharedData)
             {
-                auto& resetersCached = m_cachedConditions[ConditionType::Reseter];
-                resetersCached.m_results = m_conditions.Evaluate(ConditionType::Reseter, aDataAccess, aSharedData, m_customData);
-                if (EvaluateAnd(resetersCached.m_results))
+                if (std::ranges::all_of(m_progressTrackers[ConditionType::Reseter], [](const ProgressTracker* tracker) {
+                        return tracker->IsCompleted();
+                    }))
                 {
-                    m_status = Status::Inactive;
-                    m_customData = CustomData();
-                    if (resetersCached.m_onPassCallback)
-                    {
-                        resetersCached.m_onPassCallback(aDataAccess, aSharedData, m_customData);
-                    }
+                    SetStatus(Status::Inactive);
+                    m_progressData = ProgressData();
+                    m_progressTrackers.clear();
+                    m_conditionsSetup(m_progressData, m_progressTrackers);
+                    m_onPassCallbacks[ConditionType::Reseter](aDataAccess, aSharedData, m_progressData);
+                }
+            }
+
+            void RunUpdateForStatus(Status aStatus, const DataAccess& aDataAccess, const SharedData& aSharedData)
+            {
+                for (const auto& cb : m_updateCallbacks)
+                {
+                    cb(aStatus, aDataAccess, aSharedData, m_progressData);
                 }
             }
 
         public:
             AchievementImpl(
                 Metadata aMetadata,
-                std::unordered_map<ConditionType, std::vector<Condition<const DataAccess&, const SharedData&, CustomData&>>>
-                    aConditions,
-                std::unordered_map<ConditionType, std::vector<std::string>> aNames,
-                std::unordered_map<ConditionType, std::function<void(const DataAccess&, const SharedData&, CustomData&)>>
+                std::function<void(ProgressData&, std::unordered_map<ConditionType, std::unordered_set<ProgressTracker*>>&)>
+                    aConditionsSetup,
+                std::vector<std::function<void(Status, const DataAccess&, const SharedData&, ProgressData&)>> aUpdateCallbacks,
+                std::unordered_map<ConditionType, std::function<void(const DataAccess&, const SharedData&, ProgressData&)>>
                     aOnPassCallbacks = {})
                 : m_metadata(std::move(aMetadata))
-                , m_conditions(std::move(aConditions))
+                , m_conditionsSetup(std::move(aConditionsSetup))
+                , m_updateCallbacks(std::move(aUpdateCallbacks))
+                , m_onPassCallbacks(std::move(aOnPassCallbacks))
             {
-                for (uint32_t conditionType = 0; conditionType < static_cast<uint32_t>(ConditionType::All); ++conditionType)
+                for (uint32_t i = 0; i < static_cast<uint32_t>(ConditionType::All); ++i)
                 {
-                    m_cachedConditions.try_emplace(static_cast<ConditionType>(conditionType));
+                    ConditionType conditionType = static_cast<ConditionType>(i);
+                    m_onPassCallbacks[conditionType] = m_onPassCallbacks.contains(conditionType) ?
+                                                           m_onPassCallbacks[conditionType] :
+                                                           [](const DataAccess&, const SharedData&, ProgressData&) {};
+                    m_progressTrackers[conditionType] = {};
                 }
-                for (auto& [cType, cNames] : aNames)
-                {
-                    m_cachedConditions[cType].m_names = std::move(cNames);
-                    m_cachedConditions[cType].m_results = std::vector<bool>(m_cachedConditions[cType].m_names.size(), false);
-                    if (aOnPassCallbacks.contains(cType))
-                    {
-                        m_cachedConditions[cType].m_onPassCallback = aOnPassCallbacks[cType];
-                    }
-                }
+                m_conditionsSetup(m_progressData, m_progressTrackers);
             }
 
             void Update(const DataAccess& aDataAccess, const SharedData& aSharedData) override
             {
-                auto& preconditionsCached = m_cachedConditions[ConditionType::Precondition];
-                preconditionsCached.m_results = m_conditions.Evaluate(ConditionType::Precondition, aDataAccess, aSharedData,
-                                                                      m_customData);
-                if (!EvaluateAnd(preconditionsCached.m_results))
+                RunUpdateForStatus(Status::All, aDataAccess, aSharedData);
+                if (std::ranges::any_of(m_progressTrackers[ConditionType::Precondition], [](const ProgressTracker* tracker) {
+                        return !tracker->IsCompleted();
+                    }))
                 {
                     return;
                 }
 
-                ResetCaches();
+                RunUpdateForStatus(m_status, aDataAccess, aSharedData);
+
+                auto modifiedTrackers = m_progressData.ExtractModifiedTrackers();
+                if (modifiedTrackers.empty())
+                {
+                    return;  // no progress made
+                }
+
+                m_onProgressMadeCallback(modifiedTrackers);
 
                 switch (m_status)
                 {
@@ -220,28 +364,44 @@ namespace GE
 
             Status GetStatus() const override { return m_status; }
 
+            void SetStatus(Status aStatus)
+            {
+                if (m_status == aStatus)
+                {
+                    return;
+                }
+                m_status = aStatus;
+                m_onStatusChangedCallback(m_status);
+            }
+
+            PMA::ScopedTokenPtr OnStatusChanged(const std::function<void(Status)>& aCallback) override
+            {
+                return m_onStatusChangedCallback.Add(aCallback);
+            }
+
+            PMA::ScopedTokenPtr OnProgressMade(
+                const std::function<void(const std::unordered_set<ProgressTracker*>&)>& aCallback) override
+            {
+                return m_onProgressMadeCallback.Add(aCallback);
+            }
+
             /*
              * Custom data can be used to store name, description, difficulty, reward, ...
              * Just any static data that you might want to display.
              */
             const Metadata& GetMetadata() const override { return m_metadata; }
 
-            const std::vector<bool>& GetConditionResults(ConditionType aConditionType) const override
+            const std::unordered_set<ProgressTracker*>& GetProgress(ConditionType aConditionType) const override
             {
-                return m_cachedConditions.at(aConditionType).m_results;
-            }
-
-            const std::vector<std::string>& GetConditionNames(ConditionType aConditionType) const override
-            {
-                return m_cachedConditions.at(aConditionType).m_names;
+                return m_progressTrackers.at(aConditionType);
             }
 
             void Serialize(std::ostream& aOut) const override
             {
                 aOut << (m_status == Status::Completed);
-                if constexpr (std::is_base_of_v<PersistentData, CustomData>)
+                if constexpr (std::is_base_of_v<PersistentData, ProgressData>)
                 {
-                    m_customData.Serialize(aOut);
+                    m_progressData.Serialize(aOut);
                 }
             }
 
@@ -249,53 +409,69 @@ namespace GE
             {
                 bool completed = false;
                 aIn >> completed;
-                m_status = completed ? Status::Completed : Status::Inactive;
-                if constexpr (std::is_base_of_v<PersistentData, CustomData>)
+                SetStatus(completed ? Status::Completed : Status::Inactive);
+                if constexpr (std::is_base_of_v<PersistentData, ProgressData>)
                 {
-                    m_customData.Deserialize(aIn);
+                    m_progressData.Deserialize(aIn);
                 }
             }
         };
     }
 
-    template <typename Metadata = None, typename CustomData = None, typename SharedData = None,
+    template <typename Metadata = None, typename ProgressData = None, typename SharedData = None,
               typename DataAccess = GE::DataAccessor>
     class AchievementBuilder
     {
-        static_assert(std::is_default_constructible_v<CustomData>, "CustomData has to be default constructible");
+        static_assert(std::is_default_constructible_v<ProgressData>, "ProgressData has to be default constructible");
 
         Metadata m_metadata;
+        std::function<void(ProgressData&, std::unordered_map<ConditionType, std::unordered_set<ProgressTracker*>>&)>
+            m_conditionsSetup;
 
-        std::unordered_map<ConditionType, std::vector<Condition<const DataAccess&, const SharedData&, CustomData&>>> m_conditions;
-        std::unordered_map<ConditionType, std::vector<std::string>> m_names;
-        std::unordered_map<ConditionType, std::function<void(const DataAccess&, const SharedData&, CustomData&)>>
+        std::unordered_map<ConditionType, std::function<void(const DataAccess&, const SharedData&, ProgressData&)>>
             m_onPassCallbacks;
+        std::vector<std::function<void(Status, const DataAccess&, const SharedData&, ProgressData&)>> m_updateCallbacks;
 
     public:
-        AchievementBuilder(Metadata aMetadata)
+        using ProgressTrackerAccessor = std::variant<ProgressTrackerBool ProgressData::*, ProgressTrackerInt ProgressData::*,
+                                                     ProgressTrackerFloat ProgressData::*>;
+
+        AchievementBuilder(Metadata aMetadata, std::unordered_map<ConditionType, std::vector<ProgressTrackerAccessor>> aMapping)
+            : AchievementBuilder(std::move(aMetadata),
+                                 [aMapping = std::move(aMapping)](
+                                     ProgressData& aProgressData,
+                                     std::unordered_map<ConditionType, std::unordered_set<ProgressTracker*>>& aTrackers) {
+                                     for (const auto& [conditionType, accessors] : aMapping)
+                                     {
+                                         for (const auto& accessorVariant : accessors)
+                                         {
+                                             std::visit(
+                                                 [&](auto accessor) {
+                                                     aTrackers[conditionType].insert(&(aProgressData.*accessor));
+                                                 },
+                                                 accessorVariant);
+                                         }
+                                     }
+                                 })
+        {
+        }
+
+        AchievementBuilder(
+            Metadata aMetadata,
+            std::function<void(ProgressData&, std::unordered_map<ConditionType, std::unordered_set<ProgressTracker*>>&)>
+                aConditionsSetup)
             : m_metadata(std::move(aMetadata))
+            , m_conditionsSetup(std::move(aConditionsSetup))
         {
         }
 
         std::unique_ptr<Achievement<Metadata, SharedData, DataAccess>> Build()
         {
-            if (!m_conditions.contains(ConditionType::Activator) || !m_conditions.contains(ConditionType::Completer))
-            {
-                throw std::runtime_error("Every achievement needs at least 1 Activator and 1 Completer!");
-            }
-            return std::make_unique<details::AchievementImpl<Metadata, CustomData, SharedData, DataAccess>>(
-                std::move(m_metadata), std::move(m_conditions), std::move(m_names), std::move(m_onPassCallbacks));
+            return std::make_unique<details::AchievementImpl<Metadata, ProgressData, SharedData, DataAccess>>(
+                std::move(m_metadata), std::move(m_conditionsSetup), std::move(m_updateCallbacks), std::move(m_onPassCallbacks));
         }
 
-        AchievementBuilder& Add(ConditionType aConditionType, std::string aDescription,
-                                const typename Condition<const DataAccess&, const SharedData&, CustomData&>::Callable& aCallable,
-                                bool aOneTimeSuffice = false)
-        {
-            m_names[aConditionType].emplace_back(std::move(aDescription));
-            m_conditions[aConditionType].emplace_back(std::move(aCallable), aOneTimeSuffice);
-            return *this;
-        }
-
+        // TODO do it according to state and not conditiontypes
         /*
          * Callback will be triggered when the corresponding conditions pass and achievement status changes.
          * Activator callback: when Inactive -> Active
@@ -304,7 +480,7 @@ namespace GE
          * Reseter callback: when Failed -> Inactive
          */
         AchievementBuilder& OnPass(ConditionType aConditionType,
-                                   const std::function<void(const DataAccess&, const SharedData&, CustomData&)>& aCallback)
+                                   const std::function<void(const DataAccess&, const SharedData&, ProgressData&)>& aCallback)
         {
             if (aConditionType == ConditionType::Precondition || aConditionType == ConditionType::Validator)
             {
@@ -313,6 +489,19 @@ namespace GE
             m_onPassCallbacks[aConditionType] = aCallback;
             return *this;
         }
-    };
 
+        AchievementBuilder& Update(Status aUpdateStatus,
+                                   const std::function<void(const DataAccess&, const SharedData&, ProgressData&)>& aCallback)
+        {
+            m_updateCallbacks.push_back([aUpdateStatus, aCallback](Status aStatus, const DataAccess& aDataAccess,
+                                                                   const SharedData& aSharedData, ProgressData& aProgressData) {
+                if (aStatus != aUpdateStatus)
+                {
+                    return;
+                }
+                aCallback(aDataAccess, aSharedData, aProgressData);
+            });
+            return *this;
+        }
+    };
 }
