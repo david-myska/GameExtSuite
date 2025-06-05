@@ -141,6 +141,8 @@ namespace GE
             : ProgressTrackerT(aOwner, aStaticMessage, aTarget, !aTarget)
         {
         }
+
+        using AssignOps<bool, ProgressTrackerBool>::operator=;
     };
 
     template <typename T, typename Derived>
@@ -171,6 +173,7 @@ namespace GE
     {
     public:
         using ProgressTrackerT::ProgressTrackerT;
+        using AssignOps<int, ProgressTrackerInt>::operator=;
     };
 
     class ProgressTrackerFloat : public ProgressTrackerT<float>,
@@ -179,6 +182,7 @@ namespace GE
     {
     public:
         using ProgressTrackerT::ProgressTrackerT;
+        using AssignOps<float, ProgressTrackerFloat>::operator=;
     };
 
     struct None
