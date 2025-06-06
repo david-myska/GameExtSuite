@@ -91,7 +91,16 @@ namespace GE
         {
         }
 
-        bool IsCompleted() const override { return m_current == m_target; }
+        bool IsCompleted() const override { return m_current >= m_target; }
+
+        std::string GetMessage() const override
+        {
+            if constexpr (std::is_arithmetic_v<T>)
+            {
+                return std::format("{}:  {} / {}", m_staticMessage, m_current > m_target ? m_target : m_current, m_target);
+            }
+            return ProgressTracker::GetMessage();
+        }
 
         T GetTarget() const { return m_target; }
 
@@ -116,8 +125,6 @@ namespace GE
             m_current = aCurrent;
             m_owner->AddModifiedTracker(this);
         }
-
-        // TODO add clamp between min and max (original and target)
     };
 
     template <typename T, typename Derived>
