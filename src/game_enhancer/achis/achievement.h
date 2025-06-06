@@ -181,6 +181,7 @@ namespace GE
     public:
         using ProgressTrackerT::ProgressTrackerT;
         using AssignOps<int, ProgressTrackerInt>::operator=;
+        using ProgressTrackerT<int>::GetMessage;
     };
 
     class ProgressTrackerFloat : public ProgressTrackerT<float>,
@@ -190,6 +191,7 @@ namespace GE
     public:
         using ProgressTrackerT::ProgressTrackerT;
         using AssignOps<float, ProgressTrackerFloat>::operator=;
+        using ProgressTrackerT<float>::GetMessage;
     };
 
     struct None
