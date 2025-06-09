@@ -8,6 +8,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(pma)
 
+FetchContent_Declare(
+  spdlog
+  GIT_REPOSITORY https://github.com/gabime/spdlog.git
+  GIT_TAG        v1.15.3
+)
+FetchContent_MakeAvailable(spdlog)
+
 set(SOURCE_FILES
 				"game_enhancer/impl/memory_processor.cpp"
 				"game_enhancer/impl/data_accessor.cpp"
@@ -38,7 +45,7 @@ target_include_directories(game_enhancer PUBLIC
     $<INSTALL_INTERFACE:${GE_INSTALL_INCLUDE_DIR}>
 )
 
-target_link_libraries(game_enhancer PUBLIC PMA::pma)
+target_link_libraries(game_enhancer PUBLIC PMA::pma spdlog::spdlog)
 
 
 install(TARGETS game_enhancer DESTINATION ${GE_INSTALL_LIB_DIR})

@@ -10,6 +10,7 @@
 #include "game_enhancer/impl/layout/frame_memory_storage.h"
 #include "game_enhancer/memory_processor.h"
 #include "pma/target_process.h"
+#include "pma/impl/callback/callback.h"
 #include "pma/utility/auto_attach.h"
 
 namespace GE
@@ -49,15 +50,20 @@ namespace GE
         PMA::ScopedTokenPtr m_onAttachedToken;
         PMA::MemoryAccessPtr m_memoryAccess;
 
+        PMA::Callback<bool> m_onRunningChangedCallback;
+
         std::shared_ptr<std::deque<FrameMemoryStorage>> m_storedFrames;
         size_t m_framesToKeep = 2;
 
         size_t m_refreshRateMs = 100;
         std::jthread m_updateThread;
         std::function<void(const DataAccessor&)> m_updateCallback;
+        size_t m_consecutiveFailedUpdates = 0;
         std::atomic<bool> m_running = false;
 
         std::shared_ptr<DataAccessor> m_dataAccessor;
+
+        std::shared_ptr<spdlog::logger> m_logger;
 
         void ReadMainLayouts();
         void Update();
@@ -70,7 +76,7 @@ namespace GE
         void ResetStoredData();
 
     public:
-        MemoryProcessorImpl(PMA::TargetProcessPtr aTargetProcess);
+        MemoryProcessorImpl(PMA::TargetProcessPtr aTargetProcess, std::shared_ptr<spdlog::logger> aLogger);
         ~MemoryProcessorImpl();
 
         void RegisterLayout(const LayoutId& aLayoutId, std::unique_ptr<Layout> aLayout) override;
@@ -82,6 +88,8 @@ namespace GE
         void Stop() override;
         void RequestStop() override;
         void Wait() override;
+        bool IsRunning() const override;
+        PMA::ScopedTokenPtr OnRunningChanged(const std::function<void(bool)>& aCallback) override;
     };
 
 }

@@ -9,6 +9,7 @@
 
 #include "game_enhancer/impl/data_accessor.h"
 #include "game_enhancer/memory_layout_builder.h"
+#include "spdlog/sinks/null_sink.h"
 
 namespace GE
 {
@@ -57,6 +58,7 @@ namespace GE
 
     void MemoryProcessorImpl::ReadMainLayouts()
     {
+        m_logger->trace("ReadMainLayouts called");
         FrameMemoryStorage& currentFrameStorage = m_storedFrames->emplace_back(FrameMemoryStorage{});
         std::unordered_map<size_t, uint8_t*> pointerMap;
         for (int i = 0; i < m_mainLayoutOrder.size(); ++i)
@@ -86,6 +88,7 @@ namespace GE
 
     void MemoryProcessorImpl::Update()
     {
+        m_logger->trace("Update called");
         if (m_storedFrames->size() < m_framesToKeep)
         {
             return;
@@ -103,12 +106,17 @@ namespace GE
         try
         {
             m_updateCallback(*m_dataAccessor);
+            m_consecutiveFailedUpdates = 0;
         }
         catch (const std::exception& e)
         {
-            // TODO log error std::format("Error in MemoryProcessor callback: {}", e.what());
-            // and continue
-            throw;  // just for now
+            m_logger->error("Error in Update callback: {}", e.what());
+            if (++m_consecutiveFailedUpdates == 10)
+            {
+                m_logger->error("Too many consecutive errors in Update callback. Stopping MemoryProcessor.");
+                RequestStop();
+            }
+
         }
     }
 
@@ -187,21 +195,25 @@ namespace GE
         return storagePtr;
     }
 
-    MemoryProcessorImpl::MemoryProcessorImpl(PMA::TargetProcessPtr aTargetProcess)
+    MemoryProcessorImpl::MemoryProcessorImpl(PMA::TargetProcessPtr aTargetProcess, std::shared_ptr<spdlog::logger> aLogger)
         : m_targetProcess(std::move(aTargetProcess))
         , m_autoAttach(PMA::AutoAttach::Create(m_targetProcess))
         , m_storedFrames(std::make_shared<std::deque<FrameMemoryStorage>>())
+        , m_logger(std::move(aLogger))
     {
+        m_logger->info("MemoryProcessor created");
     }
 
     MemoryProcessorImpl::~MemoryProcessorImpl()
     {
         Stop();
+        m_logger->info("MemoryProcessor destroyed");
     }
 
     void MemoryProcessorImpl::AddMainLayout(const LayoutId& aLayoutId, const MainLayoutCallbacks& aCallbacks)
     {
         EnsureNotRunning();
+        m_logger->info("Adding main layout: {}", aLayoutId);
         if (m_mainLayouts.contains(aLayoutId))
         {
             throw std::runtime_error(std::format("Layout '{}' already defined as MainLayout", aLayoutId));
@@ -219,10 +231,11 @@ namespace GE
         m_refreshRateMs = aRateMs.value_or(1000 / aFramesToKeep);
     }
 
-    void MemoryProcessorImpl::RegisterLayout(const LayoutId& aLayoutType, std::unique_ptr<Layout> aLayout)
+    void MemoryProcessorImpl::RegisterLayout(const LayoutId& aLayoutId, std::unique_ptr<Layout> aLayout)
     {
         EnsureNotRunning();
-        m_layouts[aLayoutType] = std::move(aLayout);
+        m_logger->info("Adding layout: {}", aLayoutId);
+        m_layouts[aLayoutId] = std::move(aLayout);
     }
 
     void MemoryProcessorImpl::EnsureNotRunning() const
@@ -255,6 +268,7 @@ namespace GE
         {
             throw std::runtime_error("No update callback set!");
         }
+        m_logger->info("Requesting start");
         m_onAttachedToken = m_targetProcess->OnAttachmentChanged([this](bool aAttached) {
             if (!aAttached)
             {
@@ -263,10 +277,13 @@ namespace GE
             }
             m_memoryAccess = m_targetProcess->GetMemoryAccess();
             m_updateThread = std::jthread([this](std::stop_token aStopToken) {
+                m_logger->info("Update thread started");
                 m_running = true;
+                m_onRunningChangedCallback(true);
                 m_dataAccessor = std::make_shared<DataAccessorImpl>(m_storedFrames);
                 while (!aStopToken.stop_requested())
                 {
+                    m_logger->trace("Next frame iteration");
                     auto frameStartTime = std::chrono::steady_clock::now();
                     try
                     {
@@ -275,21 +292,17 @@ namespace GE
                     }
                     catch (const std::exception& e)
                     {
-                        std::cout << "Except in Update" << std::endl;
                         if (!m_targetProcess->Exists())
                         {
-                            // TODO log info "Target process has exited. Stopping MemoryProcessor."
-                            std::cout << "!Exists" << std::endl;
+                            m_logger->info("Stopping MemoryProcessor: Target process has exited - {}", e.what());
                         }
                         else if (!m_targetProcess->IsAttached())
                         {
-                            // TODO log error "Target process has been detached. Stopping MemoryProcessor."
-                            std::cout << "!IsAttached" << std::endl;
+                            m_logger->info("Stopping MemoryProcessor: Target process has been detached - {}", e.what());
                         }
                         else
                         {
-                            // TODO log error std::format("Error in MemoryProcessor: {}", e.what());
-                            std::cout << "Else: " << e.what() << std::endl;
+                            m_logger->error("Stopping MemoryProcessor: Unrecoverable error - {}", e.what());
                         }
                         break;
                     }
@@ -297,6 +310,8 @@ namespace GE
                 }
                 ResetStoredData();
                 m_running = false;
+                m_onRunningChangedCallback(false);
+                m_logger->info("Update thread stopped");
             });
         });
         m_autoAttach->Start();
@@ -313,20 +328,36 @@ namespace GE
 
     void MemoryProcessorImpl::RequestStop()
     {
+        m_logger->info("Requesting stop");
         m_onAttachedToken.reset();
         m_updateThread.request_stop();
     }
 
     void MemoryProcessorImpl::Wait()
     {
+        m_logger->info("Waiting for main loop to finish");
         if (m_updateThread.joinable())
         {
             m_updateThread.join();
         }
     }
 
-    MemoryProcessorPtr MemoryProcessor::Create(PMA::TargetProcessPtr aTargetProcess)
+    bool MemoryProcessorImpl::IsRunning() const
     {
-        return std::make_unique<MemoryProcessorImpl>(std::move(aTargetProcess));
+        return m_running;
+    }
+
+    PMA::ScopedTokenPtr MemoryProcessorImpl::OnRunningChanged(const std::function<void(bool)>& aCallback)
+    {
+        return m_onRunningChangedCallback.Add(aCallback);
+    }
+
+    MemoryProcessorPtr MemoryProcessor::Create(PMA::TargetProcessPtr aTargetProcess, std::shared_ptr<spdlog::logger> aLogger)
+    {
+        if (!aLogger)
+        {
+            aLogger = std::make_shared<spdlog::logger>("nolog");
+        }
+        return std::make_unique<MemoryProcessorImpl>(std::move(aTargetProcess), std::move(aLogger));
     }
 }

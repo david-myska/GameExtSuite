@@ -9,6 +9,7 @@
 #include "game_enhancer/data_accessor.h"
 #include "game_enhancer/memory_layout_builder.h"
 #include "pma/target_process.h"
+#include "spdlog/spdlog.h"
 
 namespace GE
 {
@@ -36,7 +37,8 @@ namespace GE
      */
     struct MemoryProcessor
     {
-        static [[nodiscard]] MemoryProcessorPtr Create(PMA::TargetProcessPtr aTargetProcess);
+        static [[nodiscard]] MemoryProcessorPtr Create(PMA::TargetProcessPtr aTargetProcess,
+                                                       std::shared_ptr<spdlog::logger> aLogger = {});
 
         /*
          * Registers layouts into the framework. Registered layouts can be used by other layouts and framework understands how to
@@ -116,5 +118,21 @@ namespace GE
          * - Connection to the target process was lost (target process was closed, unexpected error, ...)
          */
         virtual void Wait() = 0;
+
+        /*
+         * Returns true when the main loop is running and Update callbacks are called.
+         * Returns false when the main loop is stopped or not started yet.
+         */
+        virtual bool IsRunning() const = 0;
+
+        /*
+         * Registers callback which gets called after:
+         *   - The main loop starts successfully by calling Start() or RequestStart()
+         *   - The main loop stops successfully by calling Stop() or RequestStop()
+         *   - The main loop stops internally when unrecoverable error occurs
+         * The bool parameter indicates whether the memory processor is running (true) or not (false).
+         * Callback is active until returned ScopedToken gets destroyed.
+         */
+        virtual PMA::ScopedTokenPtr OnRunningChanged(const std::function<void(bool)>& aCallback) = 0;
     };
 }
