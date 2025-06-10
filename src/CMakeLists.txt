@@ -43,6 +43,7 @@ set_property(TARGET game_enhancer PROPERTY CXX_STANDARD 20)
 target_include_directories(game_enhancer PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${GE_INSTALL_INCLUDE_DIR}>
+	PUBLIC ${spdlog_SOURCE_DIR}/include
 )
 
 target_link_libraries(game_enhancer PUBLIC PMA::pma spdlog::spdlog)

@@ -9,6 +9,7 @@
 #include "game_enhancer/achis/conditions.h"
 #include "game_enhancer/data_accessor.h"
 #include "pma/impl/callback/callback.h"
+#include "spdlog/spdlog.h"
 
 namespace GE
 {
