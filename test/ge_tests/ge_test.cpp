@@ -7,7 +7,6 @@
 #include "game_enhancer/impl/layout/frame_memory_storage.h"
 #include "game_enhancer/memory_layout_builder.h"
 #include "game_enhancer/memory_processor.h"
-#include "pma/logging/console_logger.h"
 
 struct TestPD : public GE::BaseProgressData
 {
@@ -33,7 +32,7 @@ TEST_F(GE_Tests, Test)
                                  aTrackers[GE::ConditionType::Failer].insert(&aData.m_intTracker2);
                                  aTrackers[GE::ConditionType::Failer].insert(&aData.m_floatTracker);
                              })
-                     .Build();
+                     .Build(GetConsoleLogger());
 
     auto achi2 = TestAchiBld("Test Achievement",
                              {
@@ -50,5 +49,5 @@ TEST_F(GE_Tests, Test)
                              [](const GE::DataAccessor& aDataAccess, const GE::None&, TestPD& aPD) {
                                  // Modify ProgressTracker assigned to Completer/Failer/Validator conditions
                              })
-                     .Build();
+                     .Build(GetConsoleLogger());
 }

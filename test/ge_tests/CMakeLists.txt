@@ -17,7 +17,7 @@ FetchContent_MakeAvailable(googletest)
 
 enable_testing()
 
-add_executable(ge_tests "ge_test.cpp")
+add_executable(ge_tests "ge_test.cpp" "fixtures/ge_fixture.cpp")
 
 target_link_libraries(
   ge_tests

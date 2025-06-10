@@ -1,6 +1,8 @@
 #pragma once
 
+#include <algorithm>
 #include <iostream>
+#include <ranges>
 #include <unordered_set>
 #include <variant>
 
@@ -241,11 +243,14 @@ namespace GE
             std::unordered_map<ConditionType, std::unordered_set<ProgressTracker*>> m_progressTrackers;
 
             std::vector<std::function<void(Status, const DataAccess&, const SharedData&, ProgressData&)>> m_updateCallbacks;
-            std::unordered_map<ConditionType, std::function<void(const DataAccess&, const SharedData&, ProgressData&)>>
+            std::unordered_map<ConditionType,
+                               std::vector<std::function<void(const DataAccess&, const SharedData&, ProgressData&)>>>
                 m_onPassCallbacks;
 
             PMA::Callback<Status> m_onStatusChangedCallback;
             PMA::Callback<const std::unordered_set<ProgressTracker*>&> m_onProgressMadeCallback;
+
+            std::shared_ptr<spdlog::logger> m_logger;
 
             void ProcessInactive(const DataAccess& aDataAccess, const SharedData& aSharedData)
             {
@@ -256,12 +261,12 @@ namespace GE
                     return;
                 }
                 SetStatus(Status::Active);
-                m_onPassCallbacks[ConditionType::Activator](aDataAccess, aSharedData, m_progressData);
+                RunOnPassCallbacks(ConditionType::Activator, aDataAccess, aSharedData);
             }
 
             void ProcessActive(const DataAccess& aDataAccess, const SharedData& aSharedData)
             {
-                std::function<void(const DataAccess&, const SharedData&, ProgressData&)>* passCallback = nullptr;
+                ConditionType passConditionType = ConditionType::All;
 
                 if (std::ranges::all_of(m_progressTrackers[ConditionType::Completer], [](const ProgressTracker* tracker) {
                         return tracker->IsCompleted();
@@ -274,7 +279,7 @@ namespace GE
                     SetStatus(validated ? Status::Completed : Status::Failed);
                     if (m_status == Status::Completed)
                     {
-                        passCallback = &m_onPassCallbacks[ConditionType::Completer];
+                        passConditionType = ConditionType::Completer;
                     }
                 }
                 if (m_status == Status::Failed ||
@@ -283,12 +288,12 @@ namespace GE
                     }))
                 {
                     SetStatus(Status::Failed);
-                    passCallback = &m_onPassCallbacks[ConditionType::Failer];
+                    passConditionType = ConditionType::Failer;
                 }
 
-                if (passCallback)
+                if (passConditionType != ConditionType::All)
                 {
-                    (*passCallback)(aDataAccess, aSharedData, m_progressData);
+                    RunOnPassCallbacks(passConditionType, aDataAccess, aSharedData);
                 }
             }
 
@@ -302,7 +307,7 @@ namespace GE
                     m_progressData = ProgressData();
                     m_progressTrackers.clear();
                     m_conditionsSetup(m_progressData, m_progressTrackers);
-                    m_onPassCallbacks[ConditionType::Reseter](aDataAccess, aSharedData, m_progressData);
+                    RunOnPassCallbacks(ConditionType::Reseter, aDataAccess, aSharedData);
                 }
             }
 
@@ -314,25 +319,68 @@ namespace GE
                 }
             }
 
+            void RunOnPassCallbacks(ConditionType aConditionType, const DataAccess& aDataAccess, const SharedData& aSharedData)
+            {
+                for (const auto& cb : m_onPassCallbacks[aConditionType])
+                {
+                    cb(aDataAccess, aSharedData, m_progressData);
+                }
+            }
+
+            // clang-format off
+            std::string TryGetName() {
+                if constexpr (requires { { m_metadata.GetName() } -> std::same_as<std::string>; }) {
+                    return m_metadata.GetName();
+                }
+                else if constexpr (requires { { m_metadata.Name() } -> std::same_as<std::string>; }) {
+                    return m_metadata.Name();
+                }
+                else if constexpr (requires { { m_metadata.name } -> std::same_as<std::string>; }) {
+                    return m_metadata.name;
+                }
+                else if constexpr (requires { { m_metadata.m_name } -> std::same_as<std::string>; }) {
+                    return m_metadata.m_name;
+                }
+                else if constexpr (std::is_same_v<Metadata, std::string>) {
+                    return m_metadata;
+                }
+                return {};
+            }
+
+            // clang-format on
+
+            auto CreateOnPassLogger(ConditionType aConditionType)
+            {
+                return [=](const DataAccess&, const SharedData&, ProgressData&) {
+                    m_logger->info("Achievement '{}' passed condition '{}'", TryGetName(), to_string(aConditionType));
+                };
+            }
+
         public:
             AchievementImpl(
                 Metadata aMetadata,
                 std::function<void(ProgressData&, std::unordered_map<ConditionType, std::unordered_set<ProgressTracker*>>&)>
                     aConditionsSetup,
                 std::vector<std::function<void(Status, const DataAccess&, const SharedData&, ProgressData&)>> aUpdateCallbacks,
-                std::unordered_map<ConditionType, std::function<void(const DataAccess&, const SharedData&, ProgressData&)>>
-                    aOnPassCallbacks = {})
+                std::unordered_map<ConditionType,
+                                   std::vector<std::function<void(const DataAccess&, const SharedData&, ProgressData&)>>>
+                    aOnPassCallbacks,
+                std::shared_ptr<spdlog::logger> aLogger)
                 : m_metadata(std::move(aMetadata))
                 , m_conditionsSetup(std::move(aConditionsSetup))
                 , m_updateCallbacks(std::move(aUpdateCallbacks))
                 , m_onPassCallbacks(std::move(aOnPassCallbacks))
+                , m_logger(std::move(aLogger))
             {
                 for (uint32_t i = 0; i < static_cast<uint32_t>(ConditionType::All); ++i)
                 {
                     ConditionType conditionType = static_cast<ConditionType>(i);
-                    m_onPassCallbacks[conditionType] = m_onPassCallbacks.contains(conditionType) ?
-                                                           m_onPassCallbacks[conditionType] :
-                                                           [](const DataAccess&, const SharedData&, ProgressData&) {};
+                    if (!m_onPassCallbacks.contains(conditionType))
+                    {
+                        m_onPassCallbacks[conditionType] = {};
+                    }
+                    m_onPassCallbacks[conditionType].insert(m_onPassCallbacks[conditionType].begin(),
+                                                            CreateOnPassLogger(conditionType));
                     m_progressTrackers[conditionType] = {};
                 }
                 m_conditionsSetup(m_progressData, m_progressTrackers);
@@ -340,6 +388,10 @@ namespace GE
 
             void Update(const DataAccess& aDataAccess, const SharedData& aSharedData) override
             {
+                if (m_status == Status::Disabled || m_status == Status::Completed)
+                {
+                    return;
+                }
                 RunUpdateForStatus(Status::All, aDataAccess, aSharedData);
                 if (std::ranges::any_of(m_progressTrackers[ConditionType::Precondition], [](const ProgressTracker* tracker) {
                         return !tracker->IsCompleted();
@@ -441,7 +493,7 @@ namespace GE
         std::function<void(ProgressData&, std::unordered_map<ConditionType, std::unordered_set<ProgressTracker*>>&)>
             m_conditionsSetup;
 
-        std::unordered_map<ConditionType, std::function<void(const DataAccess&, const SharedData&, ProgressData&)>>
+        std::unordered_map<ConditionType, std::vector<std::function<void(const DataAccess&, const SharedData&, ProgressData&)>>>
             m_onPassCallbacks;
         std::vector<std::function<void(Status, const DataAccess&, const SharedData&, ProgressData&)>> m_updateCallbacks;
 
@@ -478,10 +530,15 @@ namespace GE
         {
         }
 
-        std::unique_ptr<Achievement<Metadata, SharedData, DataAccess>> Build()
+        std::unique_ptr<Achievement<Metadata, SharedData, DataAccess>> Build(std::shared_ptr<spdlog::logger> aLogger = {})
         {
+            if (!aLogger)
+            {
+                aLogger = std::make_shared<spdlog::logger>("empty");
+            }
             return std::make_unique<details::AchievementImpl<Metadata, ProgressData, SharedData, DataAccess>>(
-                std::move(m_metadata), std::move(m_conditionsSetup), std::move(m_updateCallbacks), std::move(m_onPassCallbacks));
+                std::move(m_metadata), std::move(m_conditionsSetup), std::move(m_updateCallbacks), std::move(m_onPassCallbacks),
+                std::move(aLogger));
         }
 
         // TODO do it according to state and not conditiontypes
@@ -499,7 +556,11 @@ namespace GE
             {
                 throw std::runtime_error("Precondition and Validator cannot have a pass callback");
             }
-            m_onPassCallbacks[aConditionType] = aCallback;
+            if (!m_onPassCallbacks.contains(aConditionType))
+            {
+                m_onPassCallbacks[aConditionType] = {};
+            }
+            m_onPassCallbacks[aConditionType].push_back(aCallback);
             return *this;
         }
 

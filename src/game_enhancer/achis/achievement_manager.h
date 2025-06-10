@@ -5,7 +5,7 @@
 #include <memory>
 #include <stdexcept>
 
-#include "game_enhancer/achis/achievement.h"
+#include "spdlog/spdlog.h"
 
 namespace GE
 {
@@ -16,22 +16,32 @@ namespace GE
 
         std::map<uint32_t, std::unique_ptr<AchievementType>> m_activeAchievements;
 
+        std::shared_ptr<spdlog::logger> m_logger;
+
     public:
-        AchievementManager(std::function<std::map<uint32_t, std::unique_ptr<AchievementType>>()> aAchievementCreator)
+        AchievementManager(std::function<std::map<uint32_t, std::unique_ptr<AchievementType>>()> aAchievementCreator,
+                           std::shared_ptr<spdlog::logger> aLogger)
             : m_achievementCreator(std::move(aAchievementCreator))
+            , m_logger(std::move(aLogger))
         {
+            m_logger->debug("AchievementManager created with {} achievements", m_achievementCreator().size());
         }
 
         void Activate(std::map<uint32_t, std::unique_ptr<AchievementType>> aAchievements)
         {
             Deactivate();
+            m_logger->info("New achievements activated");
             m_activeAchievements = std::move(aAchievements);
         }
 
         /*
          * Applies to the current active set of achievements.
          */
-        void Deactivate() { m_activeAchievements.clear(); }
+        void Deactivate()
+        {
+            m_logger->info("Achievements deactivated");
+            m_activeAchievements.clear();
+        }
 
         /*
          * Applies to the current active set of achievements.
@@ -39,10 +49,12 @@ namespace GE
         void Update(const typename AchievementType::_DataAccess& aDataAccess,
                     const typename AchievementType::_SharedData& aSharedData)
         {
+            m_logger->trace("Updating achievements");
             for (auto& [_, achievement] : m_activeAchievements)
             {
                 achievement->Update(aDataAccess, aSharedData);
             }
+            m_logger->trace("Finished updating achievements");
         }
 
         const auto& GetActiveAchievements() const { return m_activeAchievements; }
@@ -52,6 +64,7 @@ namespace GE
          */
         void Save(std::ostream& aOut)
         {
+            m_logger->info("Saving achievements progress");
             for (const auto& [id, achievement] : m_activeAchievements)
             {
                 aOut << id;
@@ -61,6 +74,7 @@ namespace GE
 
         auto Load(std::istream& aIn)
         {
+            m_logger->info("Loading achievements progress");
             auto loadedAchis = m_achievementCreator();
             while (aIn)
             {
