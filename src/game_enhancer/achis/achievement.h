@@ -7,6 +7,7 @@
 #include <variant>
 
 #include "game_enhancer/achis/conditions.h"
+#include "game_enhancer/achis/progress_tracker.h"
 #include "game_enhancer/data_accessor.h"
 #include "pma/impl/callback/callback.h"
 #include "spdlog/spdlog.h"
@@ -27,174 +28,6 @@ namespace GE
     {
         virtual void Serialize(std::ostream& aOut) const = 0;
         virtual void Deserialize(std::istream& aIn) = 0;
-    };
-
-    struct ProgressTracker;
-
-    class BaseProgressData
-    {
-        std::unordered_set<ProgressTracker*> m_modifiedTrackers;
-
-    public:
-        virtual ~BaseProgressData() = default;
-
-        void AddModifiedTracker(ProgressTracker* aTracker) { m_modifiedTrackers.insert(aTracker); }
-
-        std::unordered_set<ProgressTracker*> ExtractModifiedTrackers()
-        {
-            decltype(m_modifiedTrackers) result;
-            std::swap(m_modifiedTrackers, result);
-            return result;
-        }
-    };
-
-    struct ProgressTracker
-    {
-        virtual ~ProgressTracker() = default;
-
-        virtual bool IsCompleted() const = 0;
-
-        virtual std::string GetMessage() const { return m_staticMessage; }
-
-        uint32_t GetId() const { return m_id; }
-
-    protected:
-        static uint32_t GetUniqueId()
-        {
-            static std::atomic_uint32_t id = 0;
-            return ++id;
-        }
-
-        ProgressTracker(BaseProgressData* aOwner, const std::string& aStaticMessage)
-            : m_owner(aOwner)
-            , m_staticMessage(aStaticMessage)
-        {
-            if (!m_owner)
-            {
-                throw std::runtime_error("ProgressTracker owner cannot be null");
-            }
-        }
-
-        BaseProgressData* m_owner;
-        std::string m_staticMessage;
-        uint32_t m_id = GetUniqueId();
-    };
-
-    template <typename T>
-    class ProgressTrackerT : public ProgressTracker
-    {
-        T m_target;
-        T m_current;
-
-    public:
-        ProgressTrackerT(BaseProgressData* aOwner, const std::string& aStaticMessage, T aTarget, T aCurrent = {})
-            : ProgressTracker(aOwner, aStaticMessage)
-            , m_target(aTarget)
-            , m_current(aCurrent)
-        {
-        }
-
-        bool IsCompleted() const override { return m_current >= m_target; }
-
-        std::string GetMessage() const override
-        {
-            if constexpr (std::is_arithmetic_v<T>)
-            {
-                return std::format("{}:  {} / {}", m_staticMessage, m_current > m_target ? m_target : m_current, m_target);
-            }
-            return ProgressTracker::GetMessage();
-        }
-
-        T GetTarget() const { return m_target; }
-
-        void SetTarget(T aTarget)
-        {
-            if (aTarget == m_target)
-            {
-                return;
-            }
-            m_target = aTarget;
-            m_owner->AddModifiedTracker(this);
-        }
-
-        T GetCurrent() const { return m_current; }
-
-        void SetCurrent(T aCurrent)
-        {
-            if (aCurrent == m_current)
-            {
-                return;
-            }
-            m_current = aCurrent;
-            m_owner->AddModifiedTracker(this);
-        }
-    };
-
-    template <typename T, typename Derived>
-    class AssignOps
-    {
-    public:
-        Derived& operator=(T v)
-        {
-            derived().SetCurrent(v);
-            return derived();
-        }
-
-    private:
-        Derived& derived() { return static_cast<Derived&>(*this); }
-    };
-
-    class ProgressTrackerBool : public ProgressTrackerT<bool>, public AssignOps<bool, ProgressTrackerBool>
-    {
-    public:
-        ProgressTrackerBool(BaseProgressData* aOwner, const std::string& aStaticMessage, bool aTarget)
-            : ProgressTrackerT(aOwner, aStaticMessage, aTarget, !aTarget)
-        {
-        }
-
-        using AssignOps<bool, ProgressTrackerBool>::operator=;
-    };
-
-    template <typename T, typename Derived>
-    class ArithmeticOps
-    {
-    public:
-        Derived& operator+=(T v)
-        {
-            static_assert(std::is_arithmetic_v<T>);
-            derived().SetCurrent(derived().GetCurrent() + v);
-            return derived();
-        }
-
-        Derived& operator-=(T v)
-        {
-            static_assert(std::is_arithmetic_v<T>);
-            derived().SetCurrent(derived().GetCurrent() - v);
-            return derived();
-        }
-
-    private:
-        Derived& derived() { return static_cast<Derived&>(*this); }
-    };
-
-    class ProgressTrackerInt : public ProgressTrackerT<int>,
-                               public ArithmeticOps<int, ProgressTrackerInt>,
-                               public AssignOps<int, ProgressTrackerInt>
-    {
-    public:
-        using ProgressTrackerT::ProgressTrackerT;
-        using AssignOps<int, ProgressTrackerInt>::operator=;
-        using ProgressTrackerT<int>::GetMessage;
-    };
-
-    class ProgressTrackerFloat : public ProgressTrackerT<float>,
-                                 public ArithmeticOps<float, ProgressTrackerFloat>,
-                                 public AssignOps<float, ProgressTrackerFloat>
-    {
-    public:
-        using ProgressTrackerT::ProgressTrackerT;
-        using AssignOps<float, ProgressTrackerFloat>::operator=;
-        using ProgressTrackerT<float>::GetMessage;
     };
 
     struct None
@@ -499,29 +332,6 @@ namespace GE
         std::vector<std::function<void(Status, const DataAccess&, const SharedData&, ProgressData&)>> m_updateCallbacks;
 
     public:
-        using ProgressTrackerAccessor = std::variant<ProgressTrackerBool ProgressData::*, ProgressTrackerInt ProgressData::*,
-                                                     ProgressTrackerFloat ProgressData::*>;
-
-        AchievementBuilder(Metadata aMetadata, std::unordered_map<ConditionType, std::vector<ProgressTrackerAccessor>> aMapping)
-            : AchievementBuilder(std::move(aMetadata),
-                                 [aMapping = std::move(aMapping)](
-                                     ProgressData& aProgressData,
-                                     std::unordered_map<ConditionType, std::unordered_set<ProgressTracker*>>& aTrackers) {
-                                     for (const auto& [conditionType, accessors] : aMapping)
-                                     {
-                                         for (const auto& accessorVariant : accessors)
-                                         {
-                                             std::visit(
-                                                 [&](auto accessor) {
-                                                     aTrackers[conditionType].insert(&(aProgressData.*accessor));
-                                                 },
-                                                 accessorVariant);
-                                         }
-                                     }
-                                 })
-        {
-        }
-
         AchievementBuilder(
             Metadata aMetadata,
             std::function<void(ProgressData&, std::unordered_map<ConditionType, std::unordered_set<ProgressTracker*>>&)>

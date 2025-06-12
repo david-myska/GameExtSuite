@@ -11,12 +11,12 @@
 struct TestPD : public GE::BaseProgressData
 {
     // Activator
-    GE::ProgressTrackerInt m_intTracker{this, "Int Tracker", 10};
+    GE::ProgressTrackerInt<> m_intTracker{this, "Int Tracker", 10};
     // Completer
     GE::ProgressTrackerBool m_boolTracker{this, "Bool Tracker", true};
     // Failer
-    GE::ProgressTrackerInt m_intTracker2{this, "Int Tracker2", 0, 8};
-    GE::ProgressTrackerFloat m_floatTracker{this, "Float Tracker", 10.0f, 5.0f};
+    GE::ProgressTrackerInt<> m_intTracker2{this, "Int Tracker2", 0, 8};
+    GE::ProgressTrackerFloat<> m_floatTracker{this, "Float Tracker", 10.0f, 5.0f};
 };
 
 using TestAchiBld = GE::AchievementBuilder<std::string, TestPD>;
@@ -32,14 +32,6 @@ TEST_F(GE_Tests, Test)
                                  aTrackers[GE::ConditionType::Failer].insert(&aData.m_intTracker2);
                                  aTrackers[GE::ConditionType::Failer].insert(&aData.m_floatTracker);
                              })
-                     .Build(GetConsoleLogger());
-
-    auto achi2 = TestAchiBld("Test Achievement",
-                             {
-                                 {GE::ConditionType::Activator, {&TestPD::m_intTracker}                          },
-                                 {GE::ConditionType::Completer, {&TestPD::m_boolTracker}                         },
-                                 {GE::ConditionType::Failer,    {&TestPD::m_intTracker2, &TestPD::m_floatTracker}},
-    })
                      .Update(GE::Status::Inactive,
                              [](const GE::DataAccessor& aDataAccess, const GE::None&, TestPD& aPD) {
                                  // Modify ProgressTracker assigned to Activator condition
