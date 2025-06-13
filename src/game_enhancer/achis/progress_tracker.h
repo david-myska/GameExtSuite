@@ -143,7 +143,7 @@ namespace GE
     class ProgressTrackerBool : public ProgressTrackerT<bool, std::equal_to<bool>>, public AssignOps<bool, ProgressTrackerBool>
     {
     public:
-        ProgressTrackerBool(BaseProgressData* aOwner, const std::string& aStaticMessage, bool aTarget)
+        ProgressTrackerBool(BaseProgressData* aOwner, const std::string& aStaticMessage, bool aTarget = true)
             : ProgressTrackerT(aOwner, aStaticMessage, aTarget, !aTarget)
         {
         }
