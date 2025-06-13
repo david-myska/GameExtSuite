@@ -149,6 +149,8 @@ namespace GE
         }
 
         using AssignOps<bool, ProgressTrackerBool>::operator=;
+
+        std::string GetMessage() const override { return m_staticMessage; }
     };
 
     template <typename T, typename Derived>
@@ -194,4 +196,5 @@ namespace GE
         using AssignOps<float, ProgressTrackerFloat<Compare>>::operator=;
         using ProgressTrackerT<float, Compare>::GetMessage;
     };
+
 }

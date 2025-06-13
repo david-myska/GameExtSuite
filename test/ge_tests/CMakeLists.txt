@@ -24,6 +24,7 @@ target_link_libraries(
   game_enhancer
   GTest::gtest_main
   GTest::gmock_main
+  spdlog::spdlog
 )
 
 install(TARGETS ge_tests DESTINATION ${GE_INSTALL_BIN_DIR})

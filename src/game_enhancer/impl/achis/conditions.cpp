@@ -6,6 +6,7 @@
 #include <numeric>
 #include <vector>
 
+#include "game_enhancer/achis/achievement.h"
 
 namespace GE
 {
@@ -35,6 +36,29 @@ namespace GE
             return "Validator";
         case ConditionType::Reseter:
             return "Reseter";
+        default:
+            return "Unknown";
+        }
+    }
+
+    std::string to_string(Status aStatus)
+    {
+        switch (aStatus)
+        {
+        case Status::Disabled:
+            return "Disabled";
+        case Status::Inactive:
+            return "Inactive";
+        case Status::Active:
+            return "Active";
+        case Status::Paused:
+            return "Paused";
+        case Status::Completed:
+            return "Completed";
+        case Status::Failed:
+            return "Failed";
+        case Status::All:
+            return "All";
         default:
             return "Unknown";
         }
