@@ -197,4 +197,98 @@ namespace GE
         using ProgressTrackerT<float, Compare>::GetMessage;
     };
 
+    template <std::integral T>
+    std::string MinSecDynamicMessage(T aCurrent, T aTarget)
+    {
+        auto remaining = aTarget - aCurrent;
+        return std::format("{}:{:02}", remaining / 60, remaining % 60);
+    }
+
+    template <std::integral T>
+    std::string HourMinSecDynamicMessage(T aCurrent, T aTarget)
+    {
+        auto remaining = aTarget - aCurrent;
+        return std::format("{}:{:02}:{:02}", remaining / 3600, (remaining % 3600) / 60, remaining % 60);
+    }
+
+    class ProgressTrackerTimer : public ProgressTrackerT<int, std::equal_to<int>>, public AssignOps<int, ProgressTrackerTimer>
+    {
+        bool m_running = false;
+        bool m_paused = false;
+        std::chrono::steady_clock::time_point m_startTime;
+        std::chrono::steady_clock::time_point m_pauseStarted;
+        std::chrono::steady_clock::duration m_pauseDuration = std::chrono::steady_clock::duration::zero();
+
+    public:
+        ProgressTrackerTimer(BaseProgressData* aOwner, int aTarget, const std::string& aStaticMessage = "Time remaining")
+            : ProgressTrackerT(aOwner, aStaticMessage, aTarget, 0, &MinSecDynamicMessage<int>)
+        {
+        }
+
+        using AssignOps<int, ProgressTrackerTimer>::operator=;
+
+        void Start()
+        {
+            if (m_running)
+            {
+                return;
+            }
+            m_startTime = std::chrono::steady_clock::now();
+            m_running = true;
+            m_paused = false;
+        }
+
+        void Stop()
+        {
+            if (!m_running)
+            {
+                return;
+            }
+            m_running = false;
+            m_paused = false;
+        }
+
+        void Reset()
+        {
+            m_running = false;
+            m_paused = false;
+            m_pauseDuration = std::chrono::steady_clock::duration::zero();
+            SetCurrent(0);
+        }
+
+        void Pause(bool aPause = true)
+        {
+            if (!m_running || m_paused == aPause)
+            {
+                return;
+            }
+            m_paused = aPause;
+            if (m_paused)
+            {
+                m_pauseStarted = std::chrono::steady_clock::now();
+            }
+            else
+            {
+                m_pauseDuration += std::chrono::steady_clock::now() - m_pauseStarted;
+            }
+        }
+
+        void Update()
+        {
+            if (!m_running || m_paused)
+            {
+                return;
+            }
+            auto elapsed = (std::chrono::steady_clock::now() - m_pauseDuration) - m_startTime;
+            SetCurrent(static_cast<int>(std::chrono::duration_cast<std::chrono::seconds>(elapsed).count()));
+            if (IsCompleted())
+            {
+                Stop();
+            }
+        }
+
+        bool IsRunning() const { return m_running; }
+
+        bool IsPaused() const { return m_paused; }
+    };
 }
