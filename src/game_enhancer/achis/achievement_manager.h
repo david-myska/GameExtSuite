@@ -116,6 +116,6 @@ namespace GE
             return loadedAchis;
         }
 
-        void LoadAndActivate(std::istream& aIn) { Activate(Load(aIn)); }
+        void LoadAndActivate(std::optional<std::string> aId) { Activate(Load(std::move(aId))); }
     };
 }
