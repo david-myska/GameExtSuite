@@ -22,6 +22,8 @@ namespace GE
             std::variant<LayoutIdProvider, DataSizeProvider> m_pointeeType;
         };
 
+        virtual ~Layout() = default;
+
         [[nodiscard]] virtual bool IsConsecutive() const = 0;
 
         [[nodiscard]] virtual size_t GetTotalSize() const = 0;

@@ -4,6 +4,7 @@
 
 #include "game_enhancer/achis/achievement.h"
 #include "game_enhancer/achis/achievement_manager.h"
+#include "game_enhancer/backup/backup_engine.h"
 #include "game_enhancer/impl/layout/frame_memory_storage.h"
 #include "game_enhancer/memory_layout_builder.h"
 #include "game_enhancer/memory_processor.h"
@@ -24,6 +25,8 @@ using TestAchi = decltype(std::declval<TestAchiBld>().Build());
 
 TEST_F(GE_Tests, Test)
 {
+    auto backupEngine = GE::BackupEngine::Create("test_target_path", "test_backup_path", GetConsoleLogger());
+
     auto achi1 = TestAchiBld("Test Achievement",
                              [](TestPD& aData,
                                 std::unordered_map<GE::ConditionType, std::unordered_set<GE::ProgressTracker*>>& aTrackers) {

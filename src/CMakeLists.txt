@@ -21,6 +21,7 @@ set(SOURCE_FILES
 				"game_enhancer/impl/layout/memory_layout_builder.cpp"
 				"game_enhancer/impl/layout/frame_memory_storage.cpp"
 				"game_enhancer/impl/achis/conditions.cpp"
+				"game_enhancer/impl/backup/backup_engine.cpp"
 )
 
 set(HEADER_FILES
@@ -28,12 +29,14 @@ set(HEADER_FILES
 				"game_enhancer/impl/data_accessor.h"
 				"game_enhancer/impl/layout/memory_layout_builder.h"
 				"game_enhancer/impl/layout/frame_memory_storage.h"
+				"game_enhancer/impl/backup/backup_engine.h"
 )
 
 set(API_FILES
 				"game_enhancer/memory_layout_builder.h"
 				"game_enhancer/memory_processor.h"
 				"game_enhancer/data_accessor.h"
+				"game_enhancer/backup/backup_engine.h"
 )
 
 add_library(game_enhancer STATIC ${SOURCE_FILES})

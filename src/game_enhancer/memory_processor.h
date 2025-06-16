@@ -37,6 +37,8 @@ namespace GE
      */
     struct MemoryProcessor
     {
+        virtual ~MemoryProcessor() = default;
+
         static [[nodiscard]] MemoryProcessorPtr Create(PMA::TargetProcessPtr aTargetProcess,
                                                        std::shared_ptr<spdlog::logger> aLogger = {});
 
