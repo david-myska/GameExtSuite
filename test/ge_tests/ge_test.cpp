@@ -22,10 +22,18 @@ struct TestPD : public GE::BaseProgressData
 
 using TestAchiBld = GE::AchievementBuilder<std::string, TestPD>;
 using TestAchi = decltype(std::declval<TestAchiBld>().Build());
+using TestAchiType = std::remove_reference_t<decltype(*std::declval<TestAchi>())>;
 
 TEST_F(GE_Tests, Test)
 {
     auto backupEngine = GE::BackupEngine::Create("test_target_path", "test_backup_path", GetConsoleLogger());
+
+    auto achiManager = GE::AchievementManager<TestAchiType>(
+        []() {
+            std::map<uint32_t, std::unique_ptr<TestAchiType>> achis;
+            return achis;
+        },
+        "test_achievements_storage_path", GetConsoleLogger());
 
     auto achi1 = TestAchiBld("Test Achievement",
                              [](TestPD& aData,
