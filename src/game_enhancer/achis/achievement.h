@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <atomic>
-#include <iostream>
 #include <ranges>
 #include <unordered_set>
 #include <variant>
@@ -10,6 +9,7 @@
 #include "game_enhancer/achis/conditions.h"
 #include "game_enhancer/achis/progress_tracker.h"
 #include "game_enhancer/data_accessor.h"
+#include "game_enhancer/utils/serialization.h"
 #include "pma/impl/callback/callback.h"
 #include "spdlog/spdlog.h"
 
@@ -30,8 +30,8 @@ namespace GE
 
     struct PersistentData
     {
-        virtual void Serialize(std::ostream& aOut) const = 0;
-        virtual void Deserialize(std::istream& aIn) = 0;
+        virtual void Serialize(BinWriter aOut) const = 0;
+        virtual void Deserialize(BinReader aIn) = 0;
     };
 
     struct None
@@ -66,8 +66,8 @@ namespace GE
 
         virtual const std::unordered_set<ProgressTracker*>& GetProgress(ConditionType aConditionType) const = 0;
 
-        virtual void Serialize(std::ostream& aOut) const = 0;
-        virtual void Deserialize(std::istream& aIn) = 0;
+        virtual void Serialize(BinWriter aOut) const = 0;
+        virtual void Deserialize(BinReader aIn) = 0;
     };
 
     namespace details
@@ -342,19 +342,18 @@ namespace GE
                 return m_progressTrackers.at(aConditionType);
             }
 
-            void Serialize(std::ostream& aOut) const override
+            void Serialize(BinWriter aOut) const override
             {
-                aOut << (m_status == Status::Completed);
+                aOut.Write(m_status == Status::Completed);
                 if constexpr (std::is_base_of_v<PersistentData, ProgressData>)
                 {
                     m_progressData.Serialize(aOut);
                 }
             }
 
-            void Deserialize(std::istream& aIn) override
+            void Deserialize(BinReader aIn) override
             {
-                bool completed = false;
-                aIn >> completed;
+                bool completed = aIn.Read<bool>();
                 SetStatus(completed ? Status::Completed : Status::Inactive);
                 if constexpr (std::is_base_of_v<PersistentData, ProgressData>)
                 {

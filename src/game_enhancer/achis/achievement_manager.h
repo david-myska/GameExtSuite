@@ -1,7 +1,7 @@
 #pragma once
 
 #include <filesystem>
-#include <iostream>
+#include <fstream>
 #include <map>
 #include <memory>
 #include <stdexcept>
@@ -77,13 +77,13 @@ namespace GE
             {
                 throw std::invalid_argument("Save Id cannot be empty");
             }
-            auto aOutPath = m_pathToStorage / aId;
-            auto aOut = std::ofstream(aOutPath, std::ios::binary);
+            auto outStream = std::ofstream(m_pathToStorage / aId, std::ios::binary);
+            BinWriter bw(outStream);
             m_logger->info("Saving achievements progress");
             for (const auto& [id, achievement] : m_activeAchievements)
             {
-                aOut.write(&id, sizeof(id));
-                achievement->Serialize(aOut);
+                bw.Write(id);
+                achievement->Serialize(bw);
             }
         }
 
@@ -96,22 +96,22 @@ namespace GE
                 m_logger->info("No achievements file specified, creating new achievements");
                 return loadedAchis;
             }
-            auto aInPath = m_pathToStorage / aId.value();
-            if (!std::filesystem::exists(aInPath.value()))
+            auto inPath = m_pathToStorage / aId.value();
+            if (!std::filesystem::exists(inPath))
             {
-                m_logger->error("Selected achievement file does not exist: {}", aInPath->string());
+                m_logger->error("Selected achievement file does not exist: {}", inPath.string());
                 throw std::runtime_error("Selected achievement file does not exist");
             }
-            auto aIn = std::ifstream(aInPath.value(), std::ios::binary);
-            while (aIn)
+            auto inStream = std::ifstream(inPath, std::ios::binary);
+            BinReader br(inStream);
+            while (inStream)
             {
-                uint32_t id = 0;
-                aIn.read(&id, sizeof(id));
-                if (aIn.eof())
+                uint32_t id = br.Read<uint32_t>();
+                if (inStream.eof())
                 {
                     break;
                 }
-                loadedAchis.at(id)->Deserialize(aIn);
+                loadedAchis.at(id)->Deserialize(br);
             }
             return loadedAchis;
         }

@@ -34,6 +34,8 @@ TEST_F(GE_Tests, Test)
             return achis;
         },
         "test_achievements_storage_path", GetConsoleLogger());
+    achiManager.Save("");
+    achiManager.Load("");
 
     auto achi1 = TestAchiBld("Test Achievement",
                              [](TestPD& aData,
