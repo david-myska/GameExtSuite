@@ -93,14 +93,14 @@ namespace GE
             auto loadedAchis = m_achievementCreator();
             if (!aId)
             {
-                m_logger->info("No achievements file specified, creating new achievements");
+                m_logger->info("Using default achievements - no achievements file specified");
                 return loadedAchis;
             }
             auto inPath = m_pathToStorage / aId.value();
             if (!std::filesystem::exists(inPath))
             {
-                m_logger->error("Selected achievement file does not exist: {}", inPath.string());
-                throw std::runtime_error("Selected achievement file does not exist");
+                m_logger->warn("Using default achievements - selected achievement file does not exist: {}", inPath.string());
+                return loadedAchis;
             }
             auto inStream = std::ifstream(inPath, std::ios::binary);
             BinReader br(inStream);
