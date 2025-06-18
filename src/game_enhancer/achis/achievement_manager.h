@@ -73,6 +73,10 @@ namespace GE
          */
         void Save(const std::string& aId)
         {
+            if (m_activeAchievements.empty())
+            {
+                return;
+            }
             if (aId.empty())
             {
                 throw std::invalid_argument("Save Id cannot be empty");
