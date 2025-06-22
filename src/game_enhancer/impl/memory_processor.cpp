@@ -116,7 +116,6 @@ namespace GE
                 m_logger->error("Too many consecutive errors in Update callback. Stopping MemoryProcessor.");
                 RequestStop();
             }
-
         }
     }
 
@@ -195,10 +194,8 @@ namespace GE
         return storagePtr;
     }
 
-    MemoryProcessorImpl::MemoryProcessorImpl(PMA::TargetProcessPtr aTargetProcess, std::shared_ptr<spdlog::logger> aLogger)
-        : m_targetProcess(std::move(aTargetProcess))
-        , m_autoAttach(PMA::AutoAttach::Create(m_targetProcess))
-        , m_storedFrames(std::make_shared<std::deque<FrameMemoryStorage>>())
+    MemoryProcessorImpl::MemoryProcessorImpl(std::shared_ptr<spdlog::logger> aLogger)
+        : m_storedFrames(std::make_shared<std::deque<FrameMemoryStorage>>())
         , m_logger(std::move(aLogger))
     {
         m_logger->info("MemoryProcessor created");
@@ -252,16 +249,17 @@ namespace GE
         m_storedFrames->clear();
     }
 
-    void MemoryProcessorImpl::Start()
+    void MemoryProcessorImpl::Start(PMA::MemoryAccessPtr aMemoryAccess)
     {
-        RequestStart();
-        while (!m_running && m_onAttachedToken)
+        RequestStart(std::move(aMemoryAccess));
+        while (!m_running)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
         }
+        m_logger->info("MemoryProcessor started");
     }
 
-    void MemoryProcessorImpl::RequestStart()
+    void MemoryProcessorImpl::RequestStart(PMA::MemoryAccessPtr aMemoryAccess)
     {
         EnsureNotRunning();
         if (!m_updateCallback)
@@ -269,52 +267,41 @@ namespace GE
             throw std::runtime_error("No update callback set!");
         }
         m_logger->info("Requesting start");
-        m_onAttachedToken = m_targetProcess->OnAttachmentChanged([this](bool aAttached) {
-            if (!aAttached)
+        m_memoryAccess = std::move(aMemoryAccess);
+        m_updateThread = std::jthread([this](std::stop_token aStopToken) {
+            m_logger->info("Update thread started");
+            m_running = true;
+            m_onRunningChangedCallback(true);
+            m_dataAccessor = std::make_shared<DataAccessorImpl>(m_storedFrames);
+            while (!aStopToken.stop_requested())
             {
-                RequestStop();
-                return;
-            }
-            m_memoryAccess = m_targetProcess->GetMemoryAccess();
-            m_updateThread = std::jthread([this](std::stop_token aStopToken) {
-                m_logger->info("Update thread started");
-                m_running = true;
-                m_onRunningChangedCallback(true);
-                m_dataAccessor = std::make_shared<DataAccessorImpl>(m_storedFrames);
-                while (!aStopToken.stop_requested())
+                m_logger->trace("Next frame iteration");
+                auto frameStartTime = std::chrono::steady_clock::now();
+                try
                 {
-                    m_logger->trace("Next frame iteration");
-                    auto frameStartTime = std::chrono::steady_clock::now();
-                    try
-                    {
-                        ReadMainLayouts();
-                        Update();
-                    }
-                    catch (const std::exception& e)
-                    {
-                        if (!m_targetProcess->Exists())
-                        {
-                            m_logger->info("Stopping MemoryProcessor: Target process has exited - {}", e.what());
-                        }
-                        else if (!m_targetProcess->IsAttached())
-                        {
-                            m_logger->info("Stopping MemoryProcessor: Target process has been detached - {}", e.what());
-                        }
-                        else
-                        {
-                            m_logger->error("Stopping MemoryProcessor: Unrecoverable error - {}", e.what());
-                        }
-                        break;
-                    }
-                    std::this_thread::sleep_until(frameStartTime + std::chrono::milliseconds(m_refreshRateMs));
+                    ReadMainLayouts();
+                    Update();
                 }
-                ResetStoredData();
-                m_running = false;
-                m_onRunningChangedCallback(false);
-                m_logger->info("Update thread stopped");
-            });
+                catch (const std::exception& e)
+                {
+                    if (!m_memoryAccess->IsValid())
+                    {
+                        m_logger->warn("Stopping MemoryProcessor: MemoryAccess is no longer valid - {}", e.what());
+                    }
+                    else
+                    {
+                        m_logger->error("Stopping MemoryProcessor: Unrecoverable error - {}", e.what());
+                    }
+                    break;
+                }
+                std::this_thread::sleep_until(frameStartTime + std::chrono::milliseconds(m_refreshRateMs));
+            }
+            ResetStoredData();
+            m_running = false;
+            m_memoryAccess.reset();
+            m_onRunningChangedCallback(false);
+            m_logger->info("Update thread stopped");
         });
-        m_autoAttach->Start();
     }
 
     void MemoryProcessorImpl::Stop()
@@ -329,7 +316,6 @@ namespace GE
     void MemoryProcessorImpl::RequestStop()
     {
         m_logger->info("Requesting stop");
-        m_onAttachedToken.reset();
         m_updateThread.request_stop();
     }
 
@@ -352,12 +338,12 @@ namespace GE
         return m_onRunningChangedCallback.Add(aCallback);
     }
 
-    MemoryProcessorPtr MemoryProcessor::Create(PMA::TargetProcessPtr aTargetProcess, std::shared_ptr<spdlog::logger> aLogger)
+    MemoryProcessorPtr MemoryProcessor::Create(std::shared_ptr<spdlog::logger> aLogger)
     {
         if (!aLogger)
         {
             aLogger = std::make_shared<spdlog::logger>("nolog");
         }
-        return std::make_unique<MemoryProcessorImpl>(std::move(aTargetProcess), std::move(aLogger));
+        return std::make_unique<MemoryProcessorImpl>(std::move(aLogger));
     }
 }

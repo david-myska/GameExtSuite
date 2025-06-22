@@ -39,8 +39,7 @@ namespace GE
     {
         virtual ~MemoryProcessor() = default;
 
-        static [[nodiscard]] MemoryProcessorPtr Create(PMA::TargetProcessPtr aTargetProcess,
-                                                       std::shared_ptr<spdlog::logger> aLogger = {});
+        static [[nodiscard]] MemoryProcessorPtr Create(std::shared_ptr<spdlog::logger> aLogger = {});
 
         /*
          * Registers layouts into the framework. Registered layouts can be used by other layouts and framework understands how to
@@ -93,13 +92,13 @@ namespace GE
          * Starts the main loop. Update callbacks will be called at the specified refresh rate.
          * This call is blocking and returns only after successfully connecting to the target process and starting the main loop.
          */
-        virtual void Start() = 0;
+        virtual void Start(PMA::MemoryAccessPtr aMemoryAccess) = 0;
 
         /*
          * Starts the main loop. Update callbacks will be called at the specified refresh rate.
          * Returns immediately.
          */
-        virtual void RequestStart() = 0;
+        virtual void RequestStart(PMA::MemoryAccessPtr aMemoryAccess) = 0;
 
         /*
          * Stops the main loop. OnRefresh callbacks will no longer be called.

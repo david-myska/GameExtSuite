@@ -9,9 +9,8 @@
 
 #include "game_enhancer/impl/layout/frame_memory_storage.h"
 #include "game_enhancer/memory_processor.h"
-#include "pma/target_process.h"
 #include "pma/impl/callback/callback.h"
-#include "pma/utility/auto_attach.h"
+#include "pma/memory_access.h"
 
 namespace GE
 {
@@ -45,9 +44,6 @@ namespace GE
         std::unordered_map<LayoutId, MainLayout> m_mainLayouts;
         std::unordered_map<LayoutId, std::unique_ptr<Layout>> m_layouts;
 
-        PMA::TargetProcessPtr m_targetProcess;
-        PMA::AutoAttachPtr m_autoAttach;
-        PMA::ScopedTokenPtr m_onAttachedToken;
         PMA::MemoryAccessPtr m_memoryAccess;
 
         PMA::Callback<bool> m_onRunningChangedCallback;
@@ -69,22 +65,22 @@ namespace GE
         void Update();
         uint8_t* Allocate(size_t aBytes, size_t aFromAddress, FrameMemoryStorage& aCurrentFrameStorage);
         uint8_t* ReadData(size_t aBytes, size_t aFromAddress, FrameMemoryStorage& aCurrentFrameStorage);
-        uint8_t* ReadLayout(const LayoutId& aLayoutId, size_t aFromAddress,
-                            std::unordered_map<size_t, uint8_t*>& aPointerMap, FrameMemoryStorage& aCurrentFrameStorage);
+        uint8_t* ReadLayout(const LayoutId& aLayoutId, size_t aFromAddress, std::unordered_map<size_t, uint8_t*>& aPointerMap,
+                            FrameMemoryStorage& aCurrentFrameStorage);
         void EnsureNotRunning() const;
 
         void ResetStoredData();
 
     public:
-        MemoryProcessorImpl(PMA::TargetProcessPtr aTargetProcess, std::shared_ptr<spdlog::logger> aLogger);
+        MemoryProcessorImpl(std::shared_ptr<spdlog::logger> aLogger);
         ~MemoryProcessorImpl();
 
         void RegisterLayout(const LayoutId& aLayoutId, std::unique_ptr<Layout> aLayout) override;
         void AddMainLayout(const LayoutId& aLayoutId, const MainLayoutCallbacks& aCallbacks) override;
         void SetUpdateCallback(const std::function<void(const DataAccessor&)>& aCallback, size_t aFramesToKeep = 2,
                                std::optional<size_t> aRateMs = {}) override;
-        void Start() override;
-        void RequestStart() override;
+        void Start(PMA::MemoryAccessPtr aMemoryAccess) override;
+        void RequestStart(PMA::MemoryAccessPtr aMemoryAccess) override;
         void Stop() override;
         void RequestStop() override;
         void Wait() override;
