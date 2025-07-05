@@ -18,7 +18,7 @@ namespace GE
         BackupEngineImpl(std::filesystem::path aTargetPath, std::filesystem::path aBackupPath,
                          std::shared_ptr<spdlog::logger> aLogger);
 
-        void Backup(const std::optional<std::string>& aBackupName) const override;
+        void Backup(const std::optional<std::string>& aBackupName = {}, bool aAppendTimestamp = false) const override;
 
         void Restore(const std::string& aBackupName, bool aBackupCurrent) const override;
 

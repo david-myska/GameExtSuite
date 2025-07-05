@@ -26,7 +26,7 @@ namespace GE
          * Backup all files from the target directory to the backup directory. Keeping the relative directory structure.
          * If aBackupName is provided, it will be used as the name of the backup directory, default is the current date and time.
          */
-        virtual void Backup(const std::optional<std::string>& aBackupName) const = 0;
+        virtual void Backup(const std::optional<std::string>& aBackupName = {}, bool aAppendTimestamp = false) const = 0;
 
         /*
          * Restore files from the backup directory to the target directory.

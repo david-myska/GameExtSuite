@@ -11,7 +11,8 @@ namespace GE
 {
     std::string CurrentTimestamp()
     {
-        const auto now = std::chrono::zoned_time{std::chrono::current_zone(), std::chrono::system_clock::now()};
+        const auto now = std::chrono::zoned_time{std::chrono::current_zone(),
+                                                 std::chrono::floor<std::chrono::seconds>(std::chrono::system_clock::now())};
         return std::format("{:%Y-%m-%d_%H-%M-%S}", now);
     }
 
@@ -44,9 +45,15 @@ namespace GE
         }
     }
 
-    void BackupEngineImpl::Backup(const std::optional<std::string>& aBackupName) const
+    void BackupEngineImpl::Backup(const std::optional<std::string>& aBackupName, bool aAppendTimestamp) const
     {
-        const fs::path dest = m_backupPath / aBackupName.value_or(CurrentTimestamp());
+        auto timestamp = CurrentTimestamp();
+        auto backupName = aBackupName.value_or(timestamp);
+        if (aBackupName && aAppendTimestamp)
+        {
+            backupName += "_" + timestamp;
+        }
+        const fs::path dest = m_backupPath / backupName;
 
         if (!fs::exists(m_targetPath))
         {
