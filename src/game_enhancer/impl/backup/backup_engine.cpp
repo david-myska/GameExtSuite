@@ -64,7 +64,7 @@ namespace GE
 
         if (fs::exists(dest))
         {
-            throw std::runtime_error("Backup name already exists.");
+            throw std::runtime_error(std::format("Backup name '{}' already exists.", dest.string()));
         }
 
         m_logger->info("Creating backup: {}", dest.string());
@@ -74,11 +74,11 @@ namespace GE
 
     void BackupEngineImpl::Restore(const std::string& aBackupName, bool aBackupCurrent) const
     {
-        const fs::path source = m_backupPath / aBackupName / m_targetPath.filename();
+        const fs::path source = m_backupPath / aBackupName;
 
         if (!fs::exists(source))
         {
-            throw std::runtime_error("Backup does not exist.");
+            throw std::runtime_error(std::format("Backup '{}' does not exist.", source.string()));
         }
 
         if (!fs::exists(m_targetPath))
@@ -89,12 +89,13 @@ namespace GE
         constexpr auto backupCurrentName = "auto-pre-restore-backup";
         if (aBackupCurrent && aBackupName != backupCurrentName)
         {
+            m_logger->info("Creating pre-restore backup");
             Backup(backupCurrentName);
         }
 
         m_logger->info("Restoring backup: {}", source.string());
         fs::remove_all(m_targetPath);
-        fs::copy(source, m_targetPath.parent_path(), fs::copy_options::recursive | fs::copy_options::overwrite_existing);
+        fs::copy(source, m_targetPath, fs::copy_options::recursive | fs::copy_options::overwrite_existing);
     }
 
     std::vector<std::string> BackupEngineImpl::GetAvailableBackups() const
