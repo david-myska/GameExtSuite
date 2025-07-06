@@ -40,6 +40,10 @@ namespace GE
         virtual [[nodiscard]] std::vector<std::string> GetAvailableBackups() const = 0;
 
         /*
+         * Removes all backups from the backup directory.
+         */
+        virtual void RemoveAllBackups() const = 0;
+        /*
          * SetMaxBackupSize sets the maximum size of a backup in bytes.
          * If the size of the target directory exceeds this limit, an exception will be thrown during backup.
          * Default is 16 MB (16 * 1024 * 1024 bytes).

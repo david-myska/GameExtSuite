@@ -119,6 +119,12 @@ namespace GE
         return backups;
     }
 
+    void BackupEngineImpl::RemoveAllBackups() const
+    {
+        m_logger->info("Removing all backups from: {}", m_backupPath.string());
+        fs::remove_all(m_backupPath);
+    }
+
     void BackupEngineImpl::SetMaxBackupSize(size_t aMaxBackupSize)
     {
         m_logger->info("Setting maximum backup size to {} bytes", aMaxBackupSize);

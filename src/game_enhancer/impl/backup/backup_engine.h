@@ -24,6 +24,8 @@ namespace GE
 
         std::vector<std::string> GetAvailableBackups() const override;
 
+        void RemoveAllBackups() const override;
+
         void SetMaxBackupSize(size_t aMaxBackupSize) override;
     };
 }
