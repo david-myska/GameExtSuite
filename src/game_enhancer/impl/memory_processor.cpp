@@ -269,48 +269,59 @@ namespace GE
         m_logger->info("Requesting start");
         m_memoryAccess = std::move(aMemoryAccess);
         m_updateThread = std::jthread([this](std::stop_token aStopToken) {
-            m_logger->info("Update thread started");
-            m_running = true;
-            m_onRunningChangedCallback(true);
-            m_dataAccessor = std::make_shared<DataAccessorImpl>(m_storedFrames);
-            while (!aStopToken.stop_requested())
+            try
             {
-                m_logger->trace("Next frame iteration");
-                auto frameStartTime = std::chrono::steady_clock::now();
-                try
+                m_logger->info("Update thread started");
+                m_running = true;
+                m_onRunningChangedCallback(true);
+                m_dataAccessor = std::make_shared<DataAccessorImpl>(m_storedFrames);
+                while (!aStopToken.stop_requested())
                 {
-                    ReadMainLayouts();
-                    Update();
-                }
-                catch (const std::exception& e)
-                {
-                    if (!m_memoryAccess->IsValid())
+                    m_logger->trace("Next frame iteration");
+                    auto frameStartTime = std::chrono::steady_clock::now();
+                    try
                     {
-                        m_logger->warn("Stopping MemoryProcessor: MemoryAccess is no longer valid - {}", e.what());
+                        ReadMainLayouts();
+                        Update();
                     }
-                    else
+                    catch (const std::exception& e)
                     {
-                        m_logger->error("Stopping MemoryProcessor: Unrecoverable error - {}", e.what());
+                        if (!m_memoryAccess->IsValid())
+                        {
+                            m_logger->warn("Stopping MemoryProcessor: MemoryAccess is no longer valid - {}", e.what());
+                        }
+                        else
+                        {
+                            m_logger->error("Stopping MemoryProcessor: Unrecoverable error - {}", e.what());
+                        }
+                        break;
                     }
-                    break;
+                    std::this_thread::sleep_until(frameStartTime + std::chrono::milliseconds(m_refreshRateMs));
                 }
-                std::this_thread::sleep_until(frameStartTime + std::chrono::milliseconds(m_refreshRateMs));
+                ResetStoredData();
+                m_running = false;
+                m_memoryAccess.reset();
+                m_onRunningChangedCallback(false);
+                m_logger->info("Update thread stopped");
             }
-            ResetStoredData();
-            m_running = false;
-            m_memoryAccess.reset();
-            m_onRunningChangedCallback(false);
-            m_logger->info("Update thread stopped");
+            catch (const std::exception& e)
+            {
+                m_logger->error("Unhandled exception in update thread: {}", e.what());
+                m_running = false;
+                m_onRunningChangedCallback(false);
+                ResetStoredData();
+            }
+            catch (...)
+            {
+                m_logger->error("Super unexpected error in update thread");
+            }
         });
     }
 
     void MemoryProcessorImpl::Stop()
     {
         RequestStop();
-        if (m_updateThread.joinable())
-        {
-            m_updateThread.join();
-        }
+        Wait();
     }
 
     void MemoryProcessorImpl::RequestStop()
@@ -325,6 +336,7 @@ namespace GE
         if (m_updateThread.joinable())
         {
             m_updateThread.join();
+            m_logger->info("Main loop finished");
         }
     }
 
