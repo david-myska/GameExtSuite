@@ -21,7 +21,7 @@ add_executable(ge_tests "ge_test.cpp" "fixtures/ge_fixture.cpp")
 
 target_link_libraries(
   ge_tests
-  game_enhancer
+  game_ext_suite
   GTest::gtest_main
   GTest::gmock_main
   spdlog::spdlog

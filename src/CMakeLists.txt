@@ -39,21 +39,21 @@ set(API_FILES
 				"game_enhancer/backup/backup_engine.h"
 )
 
-add_library(game_enhancer STATIC ${SOURCE_FILES})
+add_library(game_ext_suite STATIC ${SOURCE_FILES})
 
-set_property(TARGET game_enhancer PROPERTY CXX_STANDARD 20)
+set_property(TARGET game_ext_suite PROPERTY CXX_STANDARD 20)
 
-target_include_directories(game_enhancer PUBLIC
+target_include_directories(game_ext_suite PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
     $<INSTALL_INTERFACE:${GE_INSTALL_INCLUDE_DIR}>
 	PUBLIC ${spdlog_SOURCE_DIR}/include
 )
 
-target_link_libraries(game_enhancer PUBLIC PMA::pma spdlog::spdlog)
+target_link_libraries(game_ext_suite PUBLIC PMA::pma spdlog::spdlog)
 
 
-install(TARGETS game_enhancer DESTINATION ${GE_INSTALL_LIB_DIR})
-install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/game_enhancer
+install(TARGETS game_ext_suite DESTINATION ${GE_INSTALL_LIB_DIR})
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/game_ext_suite
     DESTINATION ${GE_INSTALL_INCLUDE_DIR}
     FILES_MATCHING
         PATTERN "*.h"

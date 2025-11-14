@@ -1,6 +1,6 @@
 ﻿cmake_minimum_required (VERSION 3.20)
 
-project ("GameEnhancer")
+project ("GameExtSuite")
 
 set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR})
 
