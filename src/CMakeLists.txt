@@ -4,7 +4,7 @@ include(FetchContent)
 FetchContent_Declare(
   pma
   GIT_REPOSITORY https://github.com/david-myska/ProcessMemoryAccess.git
-  GIT_TAG        master
+  GIT_TAG        v1.0.0
 )
 FetchContent_MakeAvailable(pma)
 
